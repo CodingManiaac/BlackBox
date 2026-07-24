@@ -1,0 +1,28 @@
+{
+  "scenarios": [
+    {
+      "patientId": "PAT-001",
+      "query": "My father has chest pain."
+    },
+    {
+      "patientId": "PAT-002",
+      "query": "I need insulin urgently."
+    },
+    {
+      "patientId": "PAT-003",
+      "query": "I need O Negative blood."
+    },
+    {
+      "patientId": "PAT-004",
+      "query": "My child has high fever."
+    },
+    {
+      "patientId": "PAT-005",
+      "query": "Finger cut with heavy bleeding."
+    },
+    {
+      "patientId": "PAT-006",
+      "query": "Snake bite."
+    }
+  ]
+}

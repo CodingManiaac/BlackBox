@@ -1,0 +1,36 @@
+{
+  "inventory": [
+    {
+      "itemId": "insulin",
+      "name": "Insulin",
+      "stock": 25,
+      "storage": "Cold-Chain",
+      "expiry": "2027-12-01",
+      "alternatives": ["Humalog", "Novolog"]
+    },
+    {
+      "itemId": "atorvastatin",
+      "name": "Atorvastatin",
+      "stock": 140,
+      "storage": "Room Temperature",
+      "expiry": "2028-06-15",
+      "alternatives": ["Lipitor"]
+    },
+    {
+      "itemId": "blood_o_neg",
+      "name": "O- Blood Pack",
+      "stock": 6,
+      "storage": "Cold-Chain",
+      "expiry": "2026-08-20",
+      "alternatives": []
+    },
+    {
+      "itemId": "blood_a_pos",
+      "name": "A+ Blood Pack",
+      "stock": 22,
+      "storage": "Cold-Chain",
+      "expiry": "2026-08-25",
+      "alternatives": []
+    }
+  ]
+}

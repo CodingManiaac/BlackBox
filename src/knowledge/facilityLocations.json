@@ -1,0 +1,34 @@
+{
+  "facilities": [
+    {
+      "name": "City Trauma Emergency Room",
+      "type": "Hospital",
+      "distanceKm": 1.2,
+      "etaMins": 4
+    },
+    {
+      "name": "Metro General Hospital",
+      "type": "Hospital",
+      "distanceKm": 3.4,
+      "etaMins": 11
+    },
+    {
+      "name": "Care Pharmacy Store",
+      "type": "Pharmacy",
+      "distanceKm": 0.8,
+      "etaMins": 3
+    },
+    {
+      "name": "St. Jude Pediatrics Clinic",
+      "type": "Hospital",
+      "distanceKm": 4.5,
+      "etaMins": 15
+    },
+    {
+      "name": "Central Red Cross Blood Bank",
+      "type": "BloodBank",
+      "distanceKm": 2.1,
+      "etaMins": 7
+    }
+  ]
+}

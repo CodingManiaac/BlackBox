@@ -1,0 +1,667 @@
+/* ==========================================================================
+   MEDXNET ENTERPRISE DESIGN SYSTEM FOUNDATION (PHASE 1)
+   Inspired by: Linear, Stripe, Notion, Google Cloud, and Apple Health.
+   ========================================================================== */
+
+/* 1. Global Theme Configuration & Variables */
+:root {
+  /* Color Palette (Strictly Avoid Gradients, Heavy Shadows, Neon Colors) */
+  --color-background: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-primary: #2563EB;
+  --color-secondary: #14B8A6;
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-border: #E5E7EB;
+  --color-text-primary: #111827;
+  --color-text-secondary: #6B7280;
+
+  /* Color Palette Muted/Soft variants for badges/states */
+  --color-primary-soft: rgba(37, 99, 235, 0.08);
+  --color-secondary-soft: rgba(20, 184, 166, 0.08);
+  --color-success-soft: rgba(34, 197, 94, 0.08);
+  --color-warning-soft: rgba(245, 158, 11, 0.08);
+  --color-danger-soft: rgba(239, 68, 68, 0.08);
+
+  --color-success-border: rgba(34, 197, 94, 0.2);
+  --color-warning-border: rgba(245, 158, 11, 0.2);
+  --color-danger-border: rgba(239, 68, 68, 0.2);
+  --color-primary-border: rgba(37, 99, 235, 0.2);
+
+  /* Typography Scale */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  
+  --font-size-hero: 32px;
+  --font-size-page: 24px;
+  --font-size-section: 20px;
+  --font-size-card: 18px;
+  --font-size-body: 16px;
+  --font-size-caption: 13px;
+
+  --font-weight-bold: 700;
+  --font-weight-semibold: 600;
+  --font-weight-medium: 500;
+  --font-weight-regular: 400;
+
+  /* Line Heights for Improved Readability */
+  --lh-hero: 1.25;
+  --lh-page: 1.3;
+  --lh-section: 1.35;
+  --lh-card: 1.4;
+  --lh-body: 1.5;
+  --lh-caption: 1.45;
+
+  /* Letter Spacing */
+  --ls-hero: -0.02em;
+  --ls-page: -0.015em;
+  --ls-section: -0.01em;
+  --ls-card: -0.005em;
+  --ls-body: 0;
+  --ls-caption: 0.01em;
+
+  /* Spacing Grid (8-point) */
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-48: 48px;
+  --space-64: 64px;
+
+  /* Animation Durations */
+  --transition-speed: 150ms;
+  --transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Shadow Scale (Never Heavy Elevation) */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* 2. Global Reset & Base Elements */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  line-height: var(--lh-body);
+  letter-spacing: var(--ls-body);
+  font-size: var(--font-size-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 3. Typography Styles & Utility Classes */
+.medx-hero {
+  font-size: var(--font-size-hero);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--lh-hero);
+  letter-spacing: var(--ls-hero);
+  color: var(--color-text-primary);
+}
+
+.medx-title {
+  font-size: var(--font-size-page);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--lh-page);
+  letter-spacing: var(--ls-page);
+  color: var(--color-text-primary);
+}
+
+.medx-section {
+  font-size: var(--font-size-section);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--lh-section);
+  letter-spacing: var(--ls-section);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-16);
+}
+
+.medx-card-title {
+  font-size: var(--font-size-card);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--lh-card);
+  letter-spacing: var(--ls-card);
+  color: var(--color-text-primary);
+}
+
+.medx-body {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--lh-body);
+  letter-spacing: var(--ls-body);
+  color: var(--color-text-secondary);
+}
+
+.medx-caption {
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--lh-caption);
+  letter-spacing: var(--ls-caption);
+  color: var(--color-text-secondary);
+}
+
+.medx-subtitle {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--lh-body);
+  letter-spacing: var(--ls-body);
+  color: var(--color-text-secondary);
+}
+
+/* 4. Card System */
+.medx-card {
+  background-color: var(--color-surface);
+  border-radius: 16px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-24);
+  transition: transform var(--transition-speed) var(--transition-ease),
+              box-shadow var(--transition-speed) var(--transition-ease);
+}
+
+.medx-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* 5. Button Design */
+.medx-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  font-family: var(--font-family);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  height: 40px;
+  padding: 0 var(--space-16);
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--transition-speed) var(--transition-ease);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.medx-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+}
+
+/* Primary Button (Blue background, White text) */
+.medx-button-primary {
+  background-color: var(--color-primary);
+  color: #FFFFFF;
+}
+
+.medx-button-primary:hover {
+  background-color: #1D4ED8;
+}
+
+.medx-button-primary:active {
+  background-color: #1E40AF;
+}
+
+/* Secondary Button (White background, Thin border) */
+.medx-button-secondary {
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-xs);
+}
+
+.medx-button-secondary:hover {
+  background-color: #F9FAFB;
+  border-color: #D1D5DB;
+}
+
+.medx-button-secondary:active {
+  background-color: #F3F4F6;
+}
+
+/* Danger Button (Soft red) */
+.medx-button-danger {
+  background-color: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: var(--color-danger-border);
+}
+
+.medx-button-danger:hover {
+  background-color: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.medx-button-danger:active {
+  background-color: rgba(239, 68, 68, 0.2);
+}
+
+/* Ghost Button (Transparent background) */
+.medx-button-ghost {
+  background-color: transparent;
+  color: var(--color-text-secondary);
+}
+
+.medx-button-ghost:hover {
+  background-color: #F1F5F9;
+  color: var(--color-text-primary);
+}
+
+.medx-button-ghost:active {
+  background-color: #E2E8F0;
+}
+
+/* 6. Status Chips (Badges) */
+.medx-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  padding: var(--space-4) var(--space-12);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  line-height: 1;
+}
+
+.medx-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Operational Badges (Success) */
+.medx-badge-success {
+  background-color: var(--color-success-soft);
+  color: #15803D;
+  border-color: var(--color-success-border);
+}
+.medx-badge-success .medx-badge-dot {
+  background-color: var(--color-success);
+}
+
+/* Pending Badges (Warning) */
+.medx-badge-warning {
+  background-color: var(--color-warning-soft);
+  color: #B45309;
+  border-color: var(--color-warning-border);
+}
+.medx-badge-warning .medx-badge-dot {
+  background-color: var(--color-warning);
+}
+
+/* Critical Badges (Danger) */
+.medx-badge-danger {
+  background-color: var(--color-danger-soft);
+  color: #B91C1C;
+  border-color: var(--color-danger-border);
+}
+.medx-badge-danger .medx-badge-dot {
+  background-color: var(--color-danger);
+}
+
+/* Processing Badges (Primary/Info) */
+.medx-badge-info {
+  background-color: var(--color-primary-soft);
+  color: #1D4ED8;
+  border-color: var(--color-primary-border);
+}
+.medx-badge-info .medx-badge-dot {
+  background-color: var(--color-primary);
+}
+
+/* 7. Form Controls */
+.medx-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin-bottom: var(--space-16);
+}
+
+.medx-label {
+  font-size: 14px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.medx-input, .medx-select {
+  height: 40px;
+  width: 100%;
+  font-family: var(--font-family);
+  font-size: var(--font-size-body);
+  color: var(--color-text-primary);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0 var(--space-12);
+  transition: border-color var(--transition-speed) var(--transition-ease),
+              box-shadow var(--transition-speed) var(--transition-ease);
+}
+
+.medx-input:hover, .medx-select:hover {
+  border-color: #CBD5E1;
+}
+
+.medx-input:focus, .medx-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.medx-input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.8;
+}
+
+.medx-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: var(--space-32);
+}
+
+/* Custom Checkbox */
+.medx-checkbox-container {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--font-size-body);
+  color: var(--color-text-primary);
+}
+
+.medx-checkbox {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background-color: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-speed) var(--transition-ease);
+  position: relative;
+}
+
+.medx-checkbox:hover {
+  border-color: #CBD5E1;
+}
+
+.medx-checkbox:checked {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.medx-checkbox:checked::after {
+  content: "";
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+  position: absolute;
+}
+
+.medx-checkbox:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* Custom Switch/Toggle */
+.medx-switch-container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  cursor: pointer;
+  user-select: none;
+}
+
+.medx-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.medx-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.medx-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #E2E8F0;
+  transition: background-color var(--transition-speed) var(--transition-ease);
+  border-radius: 24px;
+}
+
+.medx-slider::before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: transform var(--transition-speed) var(--transition-ease);
+  border-radius: 50%;
+  box-shadow: var(--shadow-xs);
+}
+
+.medx-switch input:checked + .medx-slider {
+  background-color: var(--color-primary);
+}
+
+.medx-switch input:checked + .medx-slider::before {
+  transform: translateX(20px);
+}
+
+.medx-switch input:focus-visible + .medx-slider {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* 8. Table Styles */
+.medx-table-container {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  background-color: var(--color-surface);
+  overflow: hidden;
+}
+
+.medx-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-family: var(--font-family);
+  font-size: 14px;
+}
+
+.medx-table th {
+  position: sticky;
+  top: 0;
+  background-color: #F8FAFC; /* No dark headers */
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--space-12) var(--space-16);
+  border-bottom: 1px solid var(--color-border);
+  z-index: 10;
+}
+
+.medx-table td {
+  padding: var(--space-12) var(--space-16);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  transition: background-color var(--transition-speed) var(--transition-ease);
+}
+
+.medx-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Zebra Rows (Very subtle) */
+.medx-table tbody tr:nth-child(even) {
+  background-color: #FCFDFE;
+}
+
+/* Hover Highlight */
+.medx-table tbody tr:hover td {
+  background-color: #F1F5F9;
+}
+
+/* 9. Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Firefox scrollbar compatibility */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 transparent;
+}
+
+/* 10. Animation & Micro-interaction Classes */
+.medx-fade-in {
+  animation: fadeIn var(--transition-speed) var(--transition-ease) forwards;
+}
+
+.medx-slide-in {
+  animation: slideIn var(--transition-speed) var(--transition-ease) forwards;
+}
+
+.medx-scale-in {
+  animation: scaleIn var(--transition-speed) var(--transition-ease) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 11. Shadows Scale */
+.shadow-xs { box-shadow: var(--shadow-xs); }
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+
+/* 12. Helper Layout / Spacing Utilities */
+/* Margin utilities */
+.m-4 { margin: var(--space-4); }
+.m-8 { margin: var(--space-8); }
+.m-12 { margin: var(--space-12); }
+.m-16 { margin: var(--space-16); }
+.m-24 { margin: var(--space-24); }
+.m-32 { margin: var(--space-32); }
+.m-40 { margin: var(--space-40); }
+.m-48 { margin: var(--space-48); }
+.m-64 { margin: var(--space-64); }
+
+.mt-4 { margin-top: var(--space-4); }
+.mt-8 { margin-top: var(--space-8); }
+.mt-12 { margin-top: var(--space-12); }
+.mt-16 { margin-top: var(--space-16); }
+.mt-24 { margin-top: var(--space-24); }
+.mt-32 { margin-top: var(--space-32); }
+.mt-40 { margin-top: var(--space-40); }
+.mt-48 { margin-top: var(--space-48); }
+.mt-64 { margin-top: var(--space-64); }
+
+.mb-4 { margin-bottom: var(--space-4); }
+.mb-8 { margin-bottom: var(--space-8); }
+.mb-12 { margin-bottom: var(--space-12); }
+.mb-16 { margin-bottom: var(--space-16); }
+.mb-24 { margin-bottom: var(--space-24); }
+.mb-32 { margin-bottom: var(--space-32); }
+.mb-40 { margin-bottom: var(--space-40); }
+.mb-48 { margin-bottom: var(--space-48); }
+.mb-64 { margin-bottom: var(--space-64); }
+
+/* Padding utilities */
+.p-4 { padding: var(--space-4); }
+.p-8 { padding: var(--space-8); }
+.p-12 { padding: var(--space-12); }
+.p-16 { padding: var(--space-16); }
+.p-24 { padding: var(--space-24); }
+.p-32 { padding: var(--space-32); }
+.p-40 { padding: var(--space-40); }
+.p-48 { padding: var(--space-48); }
+.p-64 { padding: var(--space-64); }
+
+.py-4 { padding-top: var(--space-4); padding-bottom: var(--space-4); }
+.py-8 { padding-top: var(--space-8); padding-bottom: var(--space-8); }
+.py-12 { padding-top: var(--space-12); padding-bottom: var(--space-12); }
+.py-16 { padding-top: var(--space-16); padding-bottom: var(--space-16); }
+.py-24 { padding-top: var(--space-24); padding-bottom: var(--space-24); }
+.py-32 { padding-top: var(--space-32); padding-bottom: var(--space-32); }
+.py-40 { padding-top: var(--space-40); padding-bottom: var(--space-40); }
+
+.px-4 { padding-left: var(--space-4); padding-right: var(--space-4); }
+.px-8 { padding-left: var(--space-8); padding-right: var(--space-8); }
+.px-12 { padding-left: var(--space-12); padding-right: var(--space-12); }
+.px-16 { padding-left: var(--space-16); padding-right: var(--space-16); }
+.px-24 { padding-left: var(--space-24); padding-right: var(--space-24); }
+.px-32 { padding-left: var(--space-32); padding-right: var(--space-32); }
+
+/* Accessibility Keyboard Focus Highlight */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}

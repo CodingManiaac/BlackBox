@@ -1,0 +1,28 @@
+{
+  "medicines": [
+    {
+      "name": "Insulin",
+      "disease": "Diabetes",
+      "storage": "Cold-Chain (2.0°C - 8.0°C)",
+      "alternatives": ["Humalog", "Novolog", "Actrapid"]
+    },
+    {
+      "name": "Atorvastatin",
+      "disease": "Cholesterol",
+      "storage": "Room Temperature",
+      "alternatives": ["Lipitor", "Rosuvastatin"]
+    },
+    {
+      "name": "Amoxicillin",
+      "disease": "Infection",
+      "storage": "Room Temperature",
+      "alternatives": ["Penicillin", "Cephalexin"]
+    },
+    {
+      "name": "Metformin",
+      "disease": "Diabetes",
+      "storage": "Room Temperature",
+      "alternatives": ["Glucophage", "Glipizide"]
+    }
+  ]
+}

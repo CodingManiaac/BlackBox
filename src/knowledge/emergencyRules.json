@@ -1,0 +1,52 @@
+{
+  "rules": [
+    {
+      "trigger": "chest pain",
+      "eceLevel": 1,
+      "priority": "Immediate Life Threat",
+      "reason": "Indicates potential Acute Myocardial Infarction or cardiac arrest."
+    },
+    {
+      "trigger": "breathing difficulty",
+      "eceLevel": 1,
+      "priority": "Immediate Life Threat",
+      "reason": "Indicates acute respiratory distress or anaphylaxis."
+    },
+    {
+      "trigger": "heavy bleeding",
+      "eceLevel": 2,
+      "priority": "Urgent",
+      "reason": "Severe hemorrhage requires rapid tourniquet or packaging control."
+    },
+    {
+      "trigger": "snake bite",
+      "eceLevel": 2,
+      "priority": "Urgent",
+      "reason": "Envenomation risk requires rapid antivenom coordinates routing."
+    },
+    {
+      "trigger": "high fever",
+      "eceLevel": 3,
+      "priority": "Urgent",
+      "reason": "Hyperpyrexia requires clinical antipyretics or pediatric triage evaluation."
+    },
+    {
+      "trigger": "fever",
+      "eceLevel": 4,
+      "priority": "Routine",
+      "reason": "Standard fever symptoms without secondary breathing issues."
+    },
+    {
+      "trigger": "insulin",
+      "eceLevel": 3,
+      "priority": "Urgent",
+      "reason": "Urgent diabetic maintenance to prevent Diabetic Ketoacidosis (DKA)."
+    },
+    {
+      "trigger": "blood",
+      "eceLevel": 2,
+      "priority": "Urgent",
+      "reason": "Blood transfusion requirements for severe hemorrhage or surgery."
+    }
+  ]
+}
