@@ -22,8 +22,8 @@ export function seedDatabase() {
   `);
 
   const insertBloodBank = db.prepare(`
-    INSERT OR REPLACE INTO blood_banks (blood_group, quantity, expiry)
-    VALUES (?, ?, ?)
+    INSERT OR REPLACE INTO blood_banks (facility_id, blood_group, quantity, expiry)
+    VALUES (?, ?, ?, ?)
   `);
 
   const insertRider = db.prepare(`
@@ -53,7 +53,8 @@ export function seedDatabase() {
     ['PAT-003', 'Bruce Wayne', 42, 'Male', '+1-555-0322', 'AB-', 'Sulfa', 'Fractures, Tachycardia', 'Alfred Pennyworth (+1-555-0323)'],
     ['PAT-004', 'Mary Jane', 8, 'Female', '+1-555-0450', 'B+', 'Peanuts', 'Asthma', 'Peter Parker (+1-555-0451)'],
     ['PAT-005', 'Clark Kent', 29, 'Male', '+1-555-0909', 'O+', 'None', 'None', 'Martha Kent (+1-555-0910)'],
-    ['PAT-006', 'Tony Stark', 48, 'Male', '+1-555-0808', 'A-', 'Heavy Metals', 'Heart Arrhythmia', 'Pepper Potts (+1-555-0809)']
+    ['PAT-006', 'Tony Stark', 48, 'Male', '+1-555-0808', 'A-', 'Heavy Metals', 'Heart Arrhythmia', 'Pepper Potts (+1-555-0809)'],
+    ['HOSP-001', 'Metro General Hospital', 0, 'Institutional', '+1-555-9000', 'None', 'None', 'None', 'None']
   ];
 
   db.transaction(() => {
@@ -66,9 +67,21 @@ export function seedDatabase() {
   const facilities = [
     ['FAC-001', 'City Trauma Emergency Room', '452 Broadway Ave', '40.7128, -74.0060', 'LIC-HOSP-9901', '24/7', 'Active', 'Hospital'],
     ['FAC-002', 'Metro General Hospital', '1012 Metro Blvd', '40.7589, -73.9851', 'LIC-HOSP-9902', '24/7', 'Active', 'Hospital'],
-    ['FAC-003', 'Care Pharmacy Store', '88 Lexington Ave', '40.7410, -73.9890', 'LIC-PHAR-8801', '08:00 - 22:00', 'Active', 'Pharmacy'],
     ['FAC-004', 'St. Jude Pediatrics Clinic', '512 St. Jude Way', '40.7850, -73.9680', 'LIC-HOSP-9903', '09:00 - 18:00', 'Active', 'Hospital'],
-    ['FAC-005', 'Central Red Cross Blood Bank', '300 Central Park West', '40.7711, -73.9741', 'LIC-BB-7701', '24/7', 'Active', 'BloodBank']
+
+    // Pharmacies
+    ['FAC-003', 'Care Pharmacy', '88 Lexington Ave', '40.7410, -73.9890', 'LIC-PHAR-8801', '08:00 - 22:00', 'Active', 'Pharmacy'],
+    ['FAC-P01', 'Apollo Pharmacy', '124 Madison Ave', '40.7484, -73.9857', 'LIC-PHAR-8802', '24/7', 'Active', 'Pharmacy'],
+    ['FAC-P02', 'MedPlus', '350 Fifth Ave', '40.7488, -73.9854', 'LIC-PHAR-8803', '08:00 - 23:00', 'Active', 'Pharmacy'],
+    ['FAC-P03', 'Wellness Forever', '57 W 57th St', '40.7634, -73.9768', 'LIC-PHAR-8804', '24/7', 'Active', 'Pharmacy'],
+    ['FAC-P04', 'City Pharmacy', '200 Park Ave', '40.7527, -73.9772', 'LIC-PHAR-8805', '09:00 - 21:00', 'Active', 'Pharmacy'],
+
+    // Blood Banks
+    ['FAC-005', 'Red Cross Blood Bank', '300 Central Park West', '40.7711, -73.9741', 'LIC-BB-7701', '24/7', 'Active', 'BloodBank'],
+    ['FAC-B02', 'Government Blood Bank', '100 Water St', '40.7029, -74.0117', 'LIC-BB-7702', '24/7', 'Active', 'BloodBank'],
+    ['FAC-B03', 'City Blood Centre', '111 Wall St', '40.7032, -74.0079', 'LIC-BB-7703', '24/7', 'Active', 'BloodBank'],
+    ['FAC-B04', 'Apollo Blood Centre', '600 Third Ave', '40.7497, -73.9774', 'LIC-BB-7704', '24/7', 'Active', 'BloodBank'],
+    ['FAC-B05', 'LifeCare Blood Bank', '750 Seventh Ave', '40.7607, -73.9839', 'LIC-BB-7705', '24/7', 'Active', 'BloodBank']
   ];
 
   db.transaction(() => {
@@ -91,16 +104,41 @@ export function seedDatabase() {
     }
   })();
 
-  // 4. Seed Blood Inventory
-  const bloodGroups = [
-    ['O-', 6, '2026-08-20'],
-    ['A+', 22, '2026-08-25'],
-    ['B+', 14, '2026-08-29'],
-    ['AB-', 4, '2026-09-02']
+  // 4. Seed Blood Inventory across all 5 blood banks
+  const bloodBanks = [
+    // Red Cross Blood Bank (FAC-005)
+    ['FAC-005', 'O-', 15, '2026-08-20'],
+    ['FAC-005', 'O+', 30, '2026-08-25'],
+    ['FAC-005', 'A+', 25, '2026-08-29'],
+    ['FAC-005', 'B+', 20, '2026-09-02'],
+    ['FAC-005', 'AB-', 5, '2026-09-05'],
+    ['FAC-005', 'A-', 12, '2026-09-10'],
+    ['FAC-005', 'B-', 10, '2026-09-15'],
+    ['FAC-005', 'AB+', 8, '2026-09-20'],
+
+    // Government Blood Bank (FAC-B02)
+    ['FAC-B02', 'O-', 8, '2026-08-20'],
+    ['FAC-B02', 'O+', 40, '2026-08-25'],
+    ['FAC-B02', 'A+', 30, '2026-08-29'],
+    ['FAC-B02', 'B+', 15, '2026-09-02'],
+    ['FAC-B02', 'AB-', 3, '2026-09-05'],
+
+    // City Blood Centre (FAC-B03)
+    ['FAC-B03', 'O-', 2, '2026-08-20'],
+    ['FAC-B03', 'O+', 15, '2026-08-25'],
+    ['FAC-B03', 'A+', 10, '2026-08-29'],
+
+    // Apollo Blood Centre (FAC-B04)
+    ['FAC-B04', 'O-', 5, '2026-08-20'],
+    ['FAC-B04', 'O+', 22, '2026-08-25'],
+
+    // LifeCare Blood Bank (FAC-B05)
+    ['FAC-B05', 'O-', 1, '2026-08-20'],
+    ['FAC-B05', 'O+', 12, '2026-08-25']
   ];
 
   db.transaction(() => {
-    for (const b of bloodGroups) {
+    for (const b of bloodBanks) {
       insertBloodBank.run(b);
     }
   })();
@@ -121,11 +159,23 @@ export function seedDatabase() {
   // 6. Seed Demo Users
   const demoUsers = [
     ['USR-001', 'patient_demo', hashPassword('password'), 'Patient', 'John Doe', 'PAT-001'],
-    ['USR-002', 'pharmacy_demo', hashPassword('password'), 'Pharmacy', 'Care Pharmacy Store', 'FAC-003'],
+    ['USR-002', 'pharmacy_demo', hashPassword('password'), 'Pharmacy', 'Care Pharmacy', 'FAC-003'],
     ['USR-003', 'hospital_demo', hashPassword('password'), 'Hospital', 'City Trauma Emergency Room', 'FAC-001'],
-    ['USR-004', 'bloodbank_demo', hashPassword('password'), 'BloodBank', 'Central Red Cross Blood Bank', 'FAC-005'],
+    ['USR-004', 'bloodbank_demo', hashPassword('password'), 'BloodBank', 'Red Cross Blood Bank', 'FAC-005'],
     ['USR-005', 'logistics_demo', hashPassword('password'), 'Logistics', 'Dave Miller', 'RD-001'],
-    ['USR-006', 'admin_demo', hashPassword('password'), 'Admin', 'Chief Medical Officer', null]
+    ['USR-006', 'admin_demo', hashPassword('password'), 'Admin', 'Chief Medical Officer', null],
+
+    // Additional Pharmacies
+    ['USR-P01', 'apollo_pharmacy', hashPassword('password'), 'Pharmacy', 'Apollo Pharmacy', 'FAC-P01'],
+    ['USR-P02', 'medplus_pharmacy', hashPassword('password'), 'Pharmacy', 'MedPlus', 'FAC-P02'],
+    ['USR-P03', 'wellness_pharmacy', hashPassword('password'), 'Pharmacy', 'Wellness Forever', 'FAC-P03'],
+    ['USR-P04', 'city_pharmacy', hashPassword('password'), 'Pharmacy', 'City Pharmacy', 'FAC-P04'],
+
+    // Additional Blood Banks
+    ['USR-B02', 'gov_bloodbank', hashPassword('password'), 'BloodBank', 'Government Blood Bank', 'FAC-B02'],
+    ['USR-B03', 'city_bloodbank', hashPassword('password'), 'BloodBank', 'City Blood Centre', 'FAC-B03'],
+    ['USR-B04', 'apollo_bloodbank', hashPassword('password'), 'BloodBank', 'Apollo Blood Centre', 'FAC-B04'],
+    ['USR-B05', 'lifecare_bloodbank', hashPassword('password'), 'BloodBank', 'LifeCare Blood Bank', 'FAC-B05']
   ];
 
   db.transaction(() => {
@@ -180,6 +230,59 @@ export function seedDatabase() {
   db.transaction(() => {
     for (const c of categories) {
       insertCategory.run(c);
+    }
+  })();
+
+  // 10. Seed Prescription Verifications
+  const insertVerification = db.prepare(`
+    INSERT OR REPLACE INTO prescription_verifications (id, patient_name, patient_allergies, doctor_name, prescribed_drug, date, status, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const verifications = [
+    ['RXV-9920', 'A. Sterling', 'Penicillin, Peanuts', 'Dr. Sarah Jenkins', 'Amoxicillin 500mg (21 tabs)', '11:15 AM', 'Awaiting Audit', ''],
+    ['RXV-1102', 'G. Henderson', 'Sulfa Drugs', 'Dr. R. Gupta', 'Metformin 500mg (60 tabs)', '11:02 AM', 'Awaiting Audit', ''],
+    ['RXV-4399', 'M. Vance', '', 'Dr. Sarah Jenkins', 'Lisinopril 10mg (30 tabs)', '10:45 AM', 'Awaiting Audit', '']
+  ];
+
+  db.transaction(() => {
+    for (const v of verifications) {
+      insertVerification.run(v);
+    }
+  })();
+
+  // 11. Seed Hospital Stats
+  const insertHospitalStats = db.prepare(`
+    INSERT OR REPLACE INTO hospital_stats (facility_id, icu_occupied, icu_total, ventilator_occupied, ventilator_total)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  insertHospitalStats.run('FAC-001', 16, 20, 8, 12);
+
+  // 12. Seed AI Configurations
+  const insertAIConfig = db.prepare(`
+    INSERT OR REPLACE INTO ai_configurations (key, value)
+    VALUES (?, ?)
+  `);
+  insertAIConfig.run('active_model', 'Gemini 1.5 Pro');
+  insertAIConfig.run('confidence_threshold', '85');
+  insertAIConfig.run('triage_prompt', 'You are a clinical triage agent. Evaluate patient symptoms and extract severity levels from ECE-1 to ECE-5.');
+  insertAIConfig.run('gis_prompt', 'Optimize transport coordinates routing. Verify hospital and blood bank locations within delivery boundaries.');
+
+  // 13. Seed Drones
+  const insertDrone = db.prepare(`
+    INSERT OR REPLACE INTO drones (id, battery, status)
+    VALUES (?, ?, ?)
+  `);
+  const drones = [
+    ['D-01', 95, 'Idle'],
+    ['D-02', 18, 'Charging'],
+    ['D-03', 85, 'Active'],
+    ['D-04', 70, 'Active'],
+    ['D-05', 15, 'Needs Attention']
+  ];
+  db.transaction(() => {
+    for (const d of drones) {
+      insertDrone.run(d);
     }
   })();
 

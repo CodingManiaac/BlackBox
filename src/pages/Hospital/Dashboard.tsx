@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import PageHeader from '../../components/common/PageHeader';
 import KPICard from '../../components/widgets/KPICard';
 import Card from '../../components/common/Card';
@@ -7,6 +7,7 @@ import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import { useNavigation } from '../../hooks/useNavigation';
 import { ShieldAlert, ArrowRight } from 'lucide-react';
+import ActivityFeed, { ActivityItem } from '../../components/widgets/ActivityFeed';
 
 interface ERPatient {
   id: string;
@@ -19,11 +20,125 @@ interface ERPatient {
 export const Dashboard: React.FC = () => {
   const { navigateTo } = useNavigation();
 
+  const [stats, setStats] = useState({ icu_occupied: 16, icu_total: 20, ventilator_occupied: 8, ventilator_total: 12 });
+  const [incomingERList, setIncomingERList] = useState<ERPatient[]>([]);
+  const [bloodRequestsCount, setBloodRequestsCount] = useState(2);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  const getFacilityId = () => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.associatedId || 'FAC-001';
+      } catch (e) {}
+    }
+    return 'FAC-001';
+  };
+  const facilityId = getFacilityId();
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/workflow/notifications/role?role=hospital&recipientId=${facilityId}`);
+      const data = await res.json();
+      if (data.success) {
+        setNotifications(data.notifications);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleNotificationClick = async (id: string) => {
+    try {
+      await fetch(`http://localhost:3001/api/workflow/notifications/${id}/read`, { method: 'POST' });
+      fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleNotificationClearAll = async () => {
+    try {
+      await fetch('http://localhost:3001/api/workflow/notifications/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'hospital', recipientId: facilityId })
+      });
+      fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchHospitalDashboard = async () => {
+    try {
+      // 1. Fetch stats
+      const statsRes = await fetch(`http://localhost:3001/api/hospitals/stats?facilityId=${facilityId}`);
+      const statsData = await statsRes.json();
+      if (statsData.success && statsData.stats) {
+        setStats(statsData.stats);
+      }
+
+      // 2. Fetch triage requests
+      const reqRes = await fetch('http://localhost:3001/api/workflow/requests');
+      const reqData = await reqRes.json();
+      if (reqData.success) {
+        const filtered = reqData.contexts
+          .map((c: any) => JSON.parse(c.context_json))
+          .filter((ctx: any) => {
+            const eceOutput = ctx.agentOutputs.find((o: any) => o.agentId === 'ece')?.output;
+            return eceOutput && eceOutput.eceLevel <= 2 && ctx.status !== 'Delivered' && ctx.status !== 'Completed';
+          })
+          .map((ctx: any) => {
+            const eceOutput = ctx.agentOutputs.find((o: any) => o.agentId === 'ece')?.output;
+            const gisOutput = ctx.agentOutputs.find((o: any) => o.agentId === 'gis')?.output;
+            return {
+              id: `ERP-${ctx.requestId.substring(4)}`,
+              name: `Patient (${ctx.patientId})`,
+              triage: `ECE-${eceOutput.eceLevel}` as any,
+              symptoms: ctx.query,
+              eta: gisOutput?.eta || 'Pending'
+            };
+          });
+        setIncomingERList(filtered);
+      }
+
+      // 3. Fetch active blood requests
+      const ordersRes = await fetch('http://localhost:3001/api/orders');
+      const ordersData = await ordersRes.json();
+      if (ordersData.success) {
+        const bloodReqs = ordersData.orders.filter((o: any) => 
+          (o.request_type === 'Blood' || o.medicine.toLowerCase().includes('blood') || o.medicine === 'O-' || o.medicine === 'O Negative' || o.medicine === 'A+' || o.medicine === 'B+' || o.medicine === 'AB-')
+          && o.status === 'Pending'
+        );
+        setBloodRequestsCount(bloodReqs.length);
+      }
+    } catch (err) {
+      console.error('Failed to fetch hospital dashboard data:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchHospitalDashboard();
+    fetchNotifications();
+
+    const eventSource = new EventSource('http://localhost:3001/api/workflow/stream');
+    eventSource.onmessage = () => {
+      fetchHospitalDashboard();
+      fetchNotifications();
+    };
+
+    return () => eventSource.close();
+  }, []);
+
+  const icuPercent = Math.round((stats.icu_occupied / stats.icu_total) * 100);
+
   const kpis = [
-    { title: 'ICU Beds Occupancy', value: '16 / 20', badgeText: '80% Full', badgeVariant: 'warning' as const, desc: '4 critical care beds open' },
-    { title: 'Emergency Queue', value: '5 Patients', badgeText: 'High Alert', badgeVariant: 'danger' as const, desc: '2 incoming ambulances' },
-    { title: 'Active Blood Requests', value: '2 Requests', badgeText: 'Syncing', badgeVariant: 'info' as const, desc: 'O- and AB+ packs matching' },
-    { title: 'Ventilator Utilization', value: '8 / 12', badgeText: 'Optimal', badgeVariant: 'success' as const, desc: '4 machines in standby' }
+    { title: 'ICU Beds Occupancy', value: `${stats.icu_occupied} / ${stats.icu_total}`, badgeText: `${icuPercent}% Full`, badgeVariant: icuPercent >= 80 ? 'danger' as const : 'warning' as const, desc: `${stats.icu_total - stats.icu_occupied} ICU beds open` },
+    { title: 'Emergency Queue', value: `${incomingERList.length} Patients`, badgeText: incomingERList.length > 0 ? 'High Alert' : 'Normal', badgeVariant: incomingERList.length > 0 ? 'danger' as const : 'success' as const, desc: 'Realtime telemetry intakes' },
+    { title: 'Active Blood Requests', value: `${bloodRequestsCount} Requests`, badgeText: 'Syncing', badgeVariant: 'info' as const, desc: 'Awaiting Red Cross Dispatch' },
+    { title: 'Ventilator Utilization', value: `${stats.ventilator_occupied} / ${stats.ventilator_total}`, badgeText: 'Optimal', badgeVariant: 'success' as const, desc: `${stats.ventilator_total - stats.ventilator_occupied} units standby` }
   ];
 
   const erIntakeData = [
@@ -34,12 +149,6 @@ export const Dashboard: React.FC = () => {
     { hour: '16:00', patients: 4 },
     { hour: '18:00', patients: 11 },
     { hour: '20:00', patients: 3 }
-  ];
-
-  const incomingERList: ERPatient[] = [
-    { id: 'ERP-802', name: 'J. Doe', triage: 'ECE-1', symptoms: 'Cardiac arrest telemetry spikes', eta: '3 mins (AMB-20)' },
-    { id: 'ERP-110', name: 'S. Cooper', triage: 'ECE-2', symptoms: 'Sudden left-arm numbness, slurred speech', eta: '6 mins (AMB-04)' },
-    { id: 'ERP-439', name: 'R. Stark', triage: 'ECE-3', symptoms: 'Open lower-leg compound fracture', eta: '12 mins' }
   ];
 
   const getTriageBadge = (triage: ERPatient['triage']) => {
@@ -170,6 +279,21 @@ export const Dashboard: React.FC = () => {
               </Button>
             </div>
           </Card>
+
+          {/* Hospital Alerts Feed */}
+          <ActivityFeed 
+            title="Hospital Alerts & Notifications" 
+            activities={notifications.map((n: any) => ({
+              id: n.id,
+              title: n.read === 1 ? 'Read Alert' : 'Unread Alert',
+              time: new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              description: n.message,
+              badgeText: n.read === 1 ? 'Read' : 'New',
+              badgeVariant: n.read === 1 ? ('success' as const) : ('warning' as const)
+            }))}
+            onItemClick={handleNotificationClick}
+            onClearAll={handleNotificationClearAll}
+          />
 
         </div>
 

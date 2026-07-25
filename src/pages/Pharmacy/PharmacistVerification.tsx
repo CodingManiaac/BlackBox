@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PageHeader from '../../components/common/PageHeader';
 import Card from '../../components/common/Card';
 import Table, { Column } from '../../components/common/Table';
@@ -23,12 +23,7 @@ interface PrescriptionVerification {
 export const PharmacistVerification: React.FC = () => {
   const toastManager = useToast();
 
-  const [queue, setQueue] = useState<PrescriptionVerification[]>([
-    { id: 'RXV-9920', patientName: 'A. Sterling', patientAllergies: ['Penicillin', 'Peanuts'], doctorName: 'Dr. Sarah Jenkins', prescribedDrug: 'Amoxicillin 500mg (21 tabs)', date: '11:15 AM', status: 'Awaiting Audit' },
-    { id: 'RXV-1102', patientName: 'G. Henderson', patientAllergies: ['Sulfa Drugs'], doctorName: 'Dr. R. Gupta', prescribedDrug: 'Metformin 500mg (60 tabs)', date: '11:02 AM', status: 'Awaiting Audit' },
-    { id: 'RXV-4399', patientName: 'M. Vance', patientAllergies: [], doctorName: 'Dr. Sarah Jenkins', prescribedDrug: 'Lisinopril 10mg (30 tabs)', date: '10:45 AM', status: 'Awaiting Audit' }
-  ]);
-
+  const [queue, setQueue] = useState<PrescriptionVerification[]>([]);
   const [selectedAudit, setSelectedAudit] = useState<PrescriptionVerification | null>(null);
 
   // Simulators
@@ -43,6 +38,32 @@ export const PharmacistVerification: React.FC = () => {
   // Rejection modal
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+
+  const fetchQueue = async () => {
+    try {
+      const res = await fetch('http://localhost:3001/api/pharmacies/verifications');
+      const data = await res.json();
+      if (data.success) {
+        const mapped: PrescriptionVerification[] = data.queue.map((item: any) => ({
+          id: item.id,
+          patientName: item.patient_name,
+          patientAllergies: item.patient_allergies ? item.patient_allergies.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+          doctorName: item.doctor_name,
+          prescribedDrug: item.prescribed_drug,
+          date: item.date,
+          status: item.status,
+          notes: item.notes || ''
+        }));
+        setQueue(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to load pharmacist verification queue:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchQueue();
+  }, []);
 
   const handleSelectAudit = (audit: PrescriptionVerification) => {
     setSelectedAudit(audit);
@@ -85,18 +106,27 @@ export const PharmacistVerification: React.FC = () => {
   };
 
   // PIN Authorization confirm
-  const handlePinSubmit = (e: React.FormEvent) => {
+  const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pharmacistPin === '1234') {
-      // Success signoff
       if (selectedAudit) {
-        setQueue(prev => prev.map(item => {
-          if (item.id === selectedAudit.id) {
-            return { ...item, status: 'Approved' };
+        try {
+          const res = await fetch('http://localhost:3001/api/pharmacies/verifications/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: selectedAudit.id,
+              status: 'Approved',
+              notes: 'Signed off by Pharmacist #201'
+            })
+          });
+          if (res.ok) {
+            toastManager.addToast(`Prescription ${selectedAudit.id} digitally signed & approved.`, 'success');
+            fetchQueue();
           }
-          return item;
-        }));
-        toastManager.addToast(`Prescription ${selectedAudit.id} digitally signed & approved.`, 'success');
+        } catch (err) {
+          console.error(err);
+        }
       }
       setPinModalOpen(false);
       setPharmacistPin('');
@@ -107,18 +137,28 @@ export const PharmacistVerification: React.FC = () => {
   };
 
   // Reject prescription
-  const handleRejectSubmit = (e: React.FormEvent) => {
+  const handleRejectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rejectReason.trim()) return;
 
     if (selectedAudit) {
-      setQueue(prev => prev.map(item => {
-        if (item.id === selectedAudit.id) {
-          return { ...item, status: 'Rejected', notes: rejectReason };
+      try {
+        const res = await fetch('http://localhost:3001/api/pharmacies/verifications/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: selectedAudit.id,
+            status: 'Rejected',
+            notes: rejectReason
+          })
+        });
+        if (res.ok) {
+          toastManager.addToast(`Prescription ${selectedAudit.id} rejected. Reason: ${rejectReason}`, 'info');
+          fetchQueue();
         }
-        return item;
-      }));
-      toastManager.addToast(`Prescription ${selectedAudit.id} rejected. Reason: ${rejectReason}`, 'info');
+      } catch (err) {
+        console.error(err);
+      }
     }
 
     setRejectModalOpen(false);

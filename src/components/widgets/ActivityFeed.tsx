@@ -14,15 +14,35 @@ export interface ActivityItem {
 interface ActivityFeedProps {
   title: string;
   activities: ActivityItem[];
+  onItemClick?: (id: string) => void;
+  onClearAll?: () => void;
 }
 
-export const ActivityFeed: React.FC<ActivityFeedProps> = ({ title, activities }) => {
+export const ActivityFeed: React.FC<ActivityFeedProps> = ({ title, activities, onItemClick, onClearAll }) => {
   return (
     <Card shadow="sm" hoverLift={false} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <h3 className="medx-card-title" style={{ marginBottom: '16px' }}>{title}</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 className="medx-card-title" style={{ margin: 0 }}>{title}</h3>
+        {onClearAll && activities.length > 0 && (
+          <button 
+            onClick={onClearAll} 
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              color: 'var(--color-primary)', 
+              fontSize: '12px', 
+              cursor: 'pointer',
+              fontWeight: 600,
+              padding: 0
+            }}
+          >
+            Clear All
+          </button>
+        )}
+      </div>
       
       {activities.length === 0 ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }} className="medx-caption">
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', minHeight: '80px' }} className="medx-caption">
           No recent activity logs.
         </div>
       ) : (
@@ -30,12 +50,14 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ title, activities })
           {activities.map((act) => (
             <div 
               key={act.id} 
+              onClick={() => onItemClick?.(act.id)}
               style={{
                 display: 'flex',
                 alignItems: 'flex-start',
                 justifyContent: 'space-between',
                 paddingBottom: '12px',
-                borderBottom: '1px solid var(--color-border)'
+                borderBottom: '1px solid var(--color-border)',
+                cursor: onItemClick ? 'pointer' : 'default'
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

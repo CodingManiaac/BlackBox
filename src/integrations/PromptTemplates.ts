@@ -8,6 +8,8 @@ You must return only a valid JSON object matching this structure:
   "urgency": "Immediate Life Threat" | "Urgent" | "Semi-Urgent" | "Non-Urgent",
   "bloodGroup": "O-" | "A+" | "O+" | "A-" | "B+" | "AB-" | "",
   "allergies": ["allergy1"],
+  "urgencyKeywords": ["severe", "unbearable", "continuous", "worsening", "cannot breathe", "unconscious", "heavy bleeding"],
+  "reasoning": "Brief structured reasoning for patient severity understanding",
   "confidence": 0.95
 }
 

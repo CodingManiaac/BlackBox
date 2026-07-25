@@ -5,6 +5,15 @@ import path from 'path';
 const dbPath = path.resolve('server/database/medxnet.db');
 const db = new Database(dbPath);
 
+// Drop legacy blood_banks table if it lacks facility_id column
+try {
+  db.prepare("SELECT facility_id FROM blood_banks LIMIT 1").get();
+} catch (e) {
+  try {
+    db.exec('DROP TABLE IF EXISTS blood_banks');
+  } catch (err) {}
+}
+
 // Initialize schema on load
 db.exec(SCHEMA);
 
@@ -61,14 +70,26 @@ try {
 try {
   db.exec('ALTER TABLE patients ADD COLUMN consent_active INTEGER DEFAULT 1');
 } catch (e) {}
+try {
+  db.exec('ALTER TABLE patients ADD COLUMN profile_photo TEXT');
+} catch (e) {}
+try {
+  db.exec('ALTER TABLE orders ADD COLUMN return_reason TEXT');
+} catch (e) {}
+try {
+  db.exec("UPDATE orders SET ece_level = 5 WHERE ece_level = 0 OR ece_level IS NULL");
+} catch (e) {}
 
 // Ensure notifications table is created
 try {
+  db.exec("DROP TABLE IF EXISTS notifications;");
   db.exec(`
     CREATE TABLE IF NOT EXISTS notifications (
       id TEXT PRIMARY KEY,
       request_id TEXT NOT NULL,
       patient_id TEXT NOT NULL,
+      recipient_role TEXT NOT NULL,
+      recipient_id TEXT,
       message TEXT NOT NULL,
       timestamp INTEGER NOT NULL,
       read INTEGER DEFAULT 0

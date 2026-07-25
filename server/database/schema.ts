@@ -8,7 +8,16 @@ CREATE TABLE IF NOT EXISTS patients (
   blood_group TEXT NOT NULL,
   allergies TEXT,
   medical_history TEXT,
-  emergency_contacts TEXT NOT NULL
+  emergency_contacts TEXT NOT NULL,
+  email TEXT,
+  address_line TEXT,
+  city TEXT,
+  zip_code TEXT,
+  sms_notify INTEGER DEFAULT 1,
+  email_notify INTEGER DEFAULT 0,
+  language TEXT DEFAULT 'en',
+  consent_active INTEGER DEFAULT 1,
+  profile_photo TEXT
 );
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -50,9 +59,12 @@ CREATE TABLE IF NOT EXISTS facilities (
 );
 
 CREATE TABLE IF NOT EXISTS blood_banks (
-  blood_group TEXT PRIMARY KEY,
+  facility_id TEXT NOT NULL,
+  blood_group TEXT NOT NULL,
   quantity INTEGER NOT NULL,
-  expiry TEXT NOT NULL
+  expiry TEXT NOT NULL,
+  PRIMARY KEY (facility_id, blood_group),
+  FOREIGN KEY (facility_id) REFERENCES facilities(id)
 );
 
 CREATE TABLE IF NOT EXISTS inventory (
@@ -154,8 +166,40 @@ CREATE TABLE IF NOT EXISTS notifications (
   id TEXT PRIMARY KEY,
   request_id TEXT NOT NULL,
   patient_id TEXT NOT NULL,
+  recipient_role TEXT NOT NULL,
+  recipient_id TEXT,
   message TEXT NOT NULL,
   timestamp INTEGER NOT NULL,
   read INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS prescription_verifications (
+  id TEXT PRIMARY KEY,
+  patient_name TEXT NOT NULL,
+  patient_allergies TEXT NOT NULL,
+  doctor_name TEXT NOT NULL,
+  prescribed_drug TEXT NOT NULL,
+  date TEXT NOT NULL,
+  status TEXT NOT NULL,
+  notes TEXT
+);
+
+CREATE TABLE IF NOT EXISTS hospital_stats (
+  facility_id TEXT PRIMARY KEY,
+  icu_occupied INTEGER NOT NULL,
+  icu_total INTEGER NOT NULL,
+  ventilator_occupied INTEGER NOT NULL,
+  ventilator_total INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ai_configurations (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS drones (
+  id TEXT PRIMARY KEY,
+  battery INTEGER NOT NULL,
+  status TEXT NOT NULL
 );
 `;

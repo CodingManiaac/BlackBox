@@ -11,7 +11,7 @@ interface PharmacyOrder {
   patient: string;
   medication: string;
   date: string;
-  status: 'New' | 'Under Review' | 'Approved' | 'Preparing' | 'Ready' | 'Preparing Dispatch' | 'Reached Store' | 'Out for Delivery' | 'Reached Customer' | 'Delivered' | 'Cancelled' | 'Rejected' | 'Out of Stock' | 'Manual Review';
+  status: string;
   emergency: boolean;
   cost: number;
 }
@@ -23,10 +23,31 @@ export const Orders: React.FC = () => {
 
   const fetchRealOrders = async () => {
     try {
+      const session = localStorage.getItem('medx_session');
+      let currentPharmacyName = 'Care Pharmacy';
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          currentPharmacyName = parsed.name || 'Care Pharmacy';
+        } catch (e) {}
+      }
+
       const res = await fetch('http://localhost:3001/api/orders');
       const data = await res.json();
       if (data.success) {
-        const mapped: PharmacyOrder[] = data.orders.map((o: any) => ({
+        const filtered = data.orders.filter((o: any) => {
+          if (o.request_type === 'Blood') return false;
+          const assigned = o.assigned_pharmacy || 'Unassigned';
+          const isUnassigned = assigned === 'Unassigned' || assigned === 'Default Pharmacy';
+          
+          if (isUnassigned) {
+            return o.status === 'Pending';
+          } else {
+            return assigned === currentPharmacyName;
+          }
+        });
+
+        const mapped: PharmacyOrder[] = filtered.map((o: any) => ({
           id: o.id,
           patient: `Patient (${o.patient_id})`,
           medication: `${o.medicine} (Qty: ${o.quantity})`,
@@ -152,10 +173,27 @@ export const Orders: React.FC = () => {
 
         const triggerAction = async (endpoint: string, bodyObj: any = null) => {
           try {
-            const res = await fetch(`http://localhost:3001/api/workflow/${row.id}/${endpoint}`, {
+            let finalBody = bodyObj;
+            if (endpoint === 'accept') {
+              const session = localStorage.getItem('medx_session');
+              let facilityId = 'FAC-003';
+              if (session) {
+                try {
+                  const parsed = JSON.parse(session);
+                  facilityId = parsed.associatedId || 'FAC-003';
+                } catch (e) {}
+              }
+              finalBody = { facilityId, ...bodyObj };
+            }
+
+            const url = ['return-accept', 'return-reject'].includes(endpoint)
+              ? `http://localhost:3001/api/orders/${row.id}/${endpoint}`
+              : `http://localhost:3001/api/workflow/${row.id}/${endpoint}`;
+
+            const res = await fetch(url, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: bodyObj ? JSON.stringify(bodyObj) : null
+              body: finalBody ? JSON.stringify(finalBody) : null
             });
             const data = await res.json();
             if (data.success) {
@@ -278,6 +316,17 @@ export const Orders: React.FC = () => {
               <span className="medx-caption" style={{ color: 'var(--color-warning)', fontWeight: 600 }}>
                 Awaiting Manual Review
               </span>
+            )}
+
+            {row.status === 'Waiting for Pharmacy Response' && (
+              <>
+                <Button variant="primary" style={{ height: '32px', fontSize: '11px' }} onClick={() => triggerAction('return-accept')}>
+                  Accept Return
+                </Button>
+                <Button variant="danger" style={{ height: '32px', fontSize: '11px' }} onClick={() => triggerAction('return-reject')}>
+                  Reject Return
+                </Button>
+              </>
             )}
           </div>
         )

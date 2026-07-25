@@ -6,6 +6,7 @@ import Button from '../../components/common/Button';
 import { useNavigation } from '../../hooks/useNavigation';
 import { Bot, Cpu, GitBranch, Heart } from 'lucide-react';
 import { PerformanceMetrics } from '../../monitoring/MetricsCollector';
+import ActivityFeed, { ActivityItem } from '../../components/widgets/ActivityFeed';
 
 export const Dashboard: React.FC = () => {
   const { navigateTo } = useNavigation();
@@ -18,6 +19,41 @@ export const Dashboard: React.FC = () => {
     fastestAgent: { id: 'None', latencyMs: 0 },
     totalTokensUsed: 0
   });
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/workflow/notifications/role?role=admin`);
+      const data = await res.json();
+      if (data.success) {
+        setNotifications(data.notifications);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleNotificationClick = async (id: string) => {
+    try {
+      await fetch(`http://localhost:3001/api/workflow/notifications/${id}/read`, { method: 'POST' });
+      fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleNotificationClearAll = async () => {
+    try {
+      await fetch('http://localhost:3001/api/workflow/notifications/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'admin' })
+      });
+      fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
     const loadMetrics = async () => {
@@ -32,7 +68,11 @@ export const Dashboard: React.FC = () => {
       }
     };
     loadMetrics();
-    const interval = setInterval(loadMetrics, 4000);
+    fetchNotifications();
+    const interval = setInterval(() => {
+      loadMetrics();
+      fetchNotifications();
+    }, 4000);
     return () => clearInterval(interval);
   }, []);
 
@@ -135,6 +175,23 @@ export const Dashboard: React.FC = () => {
             ))}
           </div>
         </Card>
+      </div>
+
+      {/* Admin Alerts Feed */}
+      <div style={{ marginTop: '12px' }}>
+        <ActivityFeed 
+          title="System Admin Alerts & Notifications" 
+          activities={notifications.map((n: any) => ({
+            id: n.id,
+            title: n.read === 1 ? 'Read Alert' : 'Unread Alert',
+            time: new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            description: n.message,
+            badgeText: n.read === 1 ? 'Read' : 'New',
+            badgeVariant: n.read === 1 ? ('success' as const) : ('warning' as const)
+          }))}
+          onItemClick={handleNotificationClick}
+          onClearAll={handleNotificationClearAll}
+        />
       </div>
     </div>
   );

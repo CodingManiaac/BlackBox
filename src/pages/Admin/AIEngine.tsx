@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PageHeader from '../../components/common/PageHeader';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
@@ -19,9 +19,48 @@ export const AIEngine: React.FC = () => {
     'Optimize transport coordinates routing. Verify hospital and blood bank locations within delivery boundaries.'
   );
 
-  const saveConfiguration = (e: React.FormEvent) => {
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/api/system/ai-config');
+        const data = await res.json();
+        if (data.success && data.config) {
+          const cfg = data.config;
+          if (cfg.active_model) setActiveModel(cfg.active_model);
+          if (cfg.confidence_threshold) setConfidenceThreshold(Number(cfg.confidence_threshold));
+          if (cfg.triage_prompt) setTriagePrompt(cfg.triage_prompt);
+          if (cfg.gis_prompt) setGisPrompt(cfg.gis_prompt);
+        }
+      } catch (err) {
+        console.error('Failed to fetch AI configurations:', err);
+      }
+    };
+    fetchConfig();
+  }, []);
+
+  const saveConfiguration = async (e: React.FormEvent) => {
     e.preventDefault();
-    toastManager.addToast('AI Engine configurations saved successfully. Cache flushed.', 'success');
+    try {
+      const res = await fetch('http://localhost:3001/api/system/ai-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activeModel,
+          confidenceThreshold,
+          triagePrompt,
+          gisPrompt
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toastManager.addToast('AI Engine configurations saved successfully to SQLite.', 'success');
+      } else {
+        toastManager.addToast('Failed to save AI configurations.', 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      toastManager.addToast('Failed to save AI configurations.', 'danger');
+    }
   };
 
   return (

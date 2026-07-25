@@ -41,6 +41,19 @@ export const SearchMedicine: React.FC = () => {
   const toastManager = useToast();
   const { navigateTo } = useNavigation();
 
+  const getPatientId = () => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.associatedId || 'PAT-001';
+      } catch (e) {}
+    }
+    return 'PAT-001';
+  };
+  
+  const patientId = getPatientId();
+
   // State managers
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -121,7 +134,7 @@ export const SearchMedicine: React.FC = () => {
 
   const fetchCart = async () => {
     try {
-      const res = await fetch('http://localhost:3001/api/cart?patientId=PAT-001');
+      const res = await fetch(`http://localhost:3001/api/cart?patientId=${patientId}`);
       const data = await res.json();
       if (data.success) {
         const mapped: CartItem[] = data.items.map((i: any) => ({
@@ -148,7 +161,7 @@ export const SearchMedicine: React.FC = () => {
 
   const fetchAddresses = async () => {
     try {
-      const res = await fetch('http://localhost:3001/api/addresses?patientId=PAT-001');
+      const res = await fetch(`http://localhost:3001/api/addresses?patientId=${patientId}`);
       const data = await res.json();
       if (data.success) {
         setAddresses(data.addresses);
@@ -196,7 +209,7 @@ export const SearchMedicine: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          patientId: 'PAT-001',
+          patientId: patientId,
           medicineId: med.id,
           quantity: 1
         })
@@ -269,7 +282,7 @@ export const SearchMedicine: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          patientId: 'PAT-001',
+          patientId: patientId,
           name: newName,
           addressLine: newAddressLine,
           city: newCity,
@@ -315,7 +328,7 @@ export const SearchMedicine: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          patientId: 'PAT-001',
+          patientId: patientId,
           items: cart.map(item => ({
             name: item.medicine.name,
             price: item.medicine.price,
@@ -364,7 +377,7 @@ export const SearchMedicine: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderId: tempOrderId,
-          patientId: 'PAT-001',
+          patientId: patientId,
           query
         })
       });

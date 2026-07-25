@@ -9,9 +9,11 @@ export interface MedicineInventory {
 }
 
 export interface BloodInventory {
+  facility_id?: string;
   blood_group: string;
   quantity: number;
   expiry: string;
+  facility_name?: string;
 }
 
 export class InventoryRepository {
@@ -46,7 +48,11 @@ export class InventoryRepository {
   }
 
   static listBlood(): BloodInventory[] {
-    return db.prepare('SELECT * FROM blood_banks').all() as BloodInventory[];
+    return db.prepare(`
+      SELECT b.*, f.name as facility_name
+      FROM blood_banks b
+      LEFT JOIN facilities f ON b.facility_id = f.id
+    `).all() as BloodInventory[];
   }
 }
 export default InventoryRepository;

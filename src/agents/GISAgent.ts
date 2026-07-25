@@ -29,9 +29,9 @@ export class GISAgent extends BaseAgent {
     const facilityCoordinates: Record<string, string> = {
       "City Trauma Emergency Room": "40.7128, -74.0060",
       "Metro General Hospital": "40.7589, -73.9851",
-      "Care Pharmacy Store": "40.7410, -73.9890",
+      "Care Pharmacy": "40.7410, -73.9890",
       "St. Jude Pediatrics Clinic": "40.7850, -73.9680",
-      "Central Red Cross Blood Bank": "40.7711, -73.9741"
+      "Red Cross Blood Bank": "40.7711, -73.9741"
     };
 
     const patientLoc = "40.7128, -74.0060"; // Seed coordinates

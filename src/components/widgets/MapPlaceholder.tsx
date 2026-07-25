@@ -15,7 +15,7 @@ export const MapPlaceholder: React.FC<MapPlaceholderProps> = ({
   title, 
   description,
   status = 'Ready',
-  assignedPharmacy = 'Care Pharmacy Store',
+  assignedPharmacy = 'Care Pharmacy',
   assignedRider = 'Dave Miller',
   eceLevel = 5
 }) => {

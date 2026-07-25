@@ -19,6 +19,41 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ role, title, onMenuToggle 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
 
+  const [profileName, setProfileName] = useState(() => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.name || parsed.username || 'User';
+      } catch (e) {}
+    }
+    return 'User';
+  });
+  const [profileImage, setProfileImage] = useState('');
+  const [patientAddress, setPatientAddress] = useState('');
+
+  const fetchProfile = async () => {
+    try {
+      const session = localStorage.getItem('medx_session');
+      if (!session) return;
+      const parsed = JSON.parse(session);
+      if (parsed.role === 'Patient') {
+        const patientId = parsed.associatedId || 'PAT-001';
+        const res = await fetch(`http://localhost:3001/api/patients/${patientId}`);
+        const data = await res.json();
+        if (data.success && data.patient) {
+          setProfileName(data.patient.name || 'John Doe');
+          setProfileImage(data.patient.profile_photo || '');
+          setPatientAddress(data.patient.address_line || '');
+        }
+      } else {
+        setProfileName(parsed.name || parsed.username || 'User');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const fetchNotifications = async () => {
     try {
       const session = localStorage.getItem('medx_session');
@@ -39,6 +74,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ role, title, onMenuToggle 
 
   useEffect(() => {
     fetchNotifications();
+    fetchProfile();
 
     const eventSource = new EventSource('http://localhost:3001/api/workflow/stream');
     eventSource.onmessage = (event) => {
@@ -50,7 +86,21 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ role, title, onMenuToggle 
       } catch (e) {}
     };
 
-    return () => eventSource.close();
+    const handleUpdate = (e: any) => {
+      if (e.detail) {
+        setProfileName(e.detail.name || 'John Doe');
+        setProfileImage(e.detail.profile_photo || '');
+        setPatientAddress(e.detail.address_line || '');
+      } else {
+        fetchProfile();
+      }
+    };
+    window.addEventListener('patient-profile-updated', handleUpdate);
+
+    return () => {
+      eventSource.close();
+      window.removeEventListener('patient-profile-updated', handleUpdate);
+    };
   }, []);
 
   const handleThemeToggle = () => {
@@ -201,12 +251,17 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ role, title, onMenuToggle 
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'var(--color-text-secondary)'
+              color: 'var(--color-text-secondary)',
+              overflow: 'hidden'
             }}>
-              <Icons.User size={14} />
+              {profileImage ? (
+                <img src={profileImage} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <Icons.User size={14} />
+              )}
             </div>
             <span className="medx-caption" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              Vishu Kumar
+              {profileName}
             </span>
             <Icons.ChevronDown size={14} style={{ color: 'var(--color-text-secondary)' }} />
           </button>
@@ -227,8 +282,13 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ role, title, onMenuToggle 
               }}
             >
               <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--color-border)' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600 }}>Vishu Kumar</div>
+                <div style={{ fontSize: '13px', fontWeight: 600 }}>{profileName}</div>
                 <div className="medx-caption" style={{ fontSize: '11px' }}>Active Role: {role}</div>
+                {role === 'Patient' && patientAddress && (
+                  <div className="medx-caption" style={{ fontSize: '10px', color: 'var(--color-text-secondary)', marginTop: '4px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={patientAddress}>
+                    📍 {patientAddress}
+                  </div>
+                )}
               </div>
 
 

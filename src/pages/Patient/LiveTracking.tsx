@@ -26,13 +26,23 @@ export const LiveTracking: React.FC = () => {
   // Load orders
   const fetchOrders = async () => {
     try {
+      const session = localStorage.getItem('medx_session');
+      let patientId = 'PAT-001';
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          patientId = parsed.associatedId || 'PAT-001';
+        } catch (e) {}
+      }
+
       const res = await fetch('http://localhost:3001/api/orders');
       const data = await res.json();
-      if (data.success && data.orders.length > 0) {
-        setOrders(data.orders);
+      if (data.success) {
+        const userOrders = data.orders.filter((o: any) => o.patient_id === patientId);
+        setOrders(userOrders);
         setSelectedOrderId(prev => {
-          if (!prev || !data.orders.some((o: any) => o.id === prev)) {
-            return data.orders[0].id;
+          if (!prev || !userOrders.some((o: any) => o.id === prev)) {
+            return userOrders.length > 0 ? userOrders[0].id : '';
           }
           return prev;
         });
@@ -47,7 +57,8 @@ export const LiveTracking: React.FC = () => {
     const eventSource = new EventSource('http://localhost:3001/api/workflow/stream');
     eventSource.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data);
+        const data = JSON.parse(event.data);
+        const payload = data.event || data;
         if (payload.orderId || payload.requestId) {
           setSelectedOrderId(payload.orderId || payload.requestId);
         }
@@ -234,7 +245,11 @@ export const LiveTracking: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Fulfillment:</span>
-                    <strong style={{ fontSize: '12px' }}>{selectedOrder.assigned_pharmacy || ' Apollo Pharmacy'}</strong>
+                    <strong style={{ fontSize: '12px' }}>
+                      {selectedOrder.assigned_pharmacy && selectedOrder.assigned_pharmacy !== 'Default Pharmacy' && selectedOrder.assigned_pharmacy !== 'Unassigned'
+                        ? selectedOrder.assigned_pharmacy 
+                        : 'Awaiting Acceptance'}
+                    </strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Rider Assigned:</span>
@@ -246,8 +261,18 @@ export const LiveTracking: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Workflow Severity:</span>
-                    <Badge variant={selectedOrder.ece_level >= 2 ? 'warning' : 'danger'}>
-                      ECE-{selectedOrder.ece_level}
+                    <Badge variant={
+                      selectedOrder.ece_level === 1 ? 'danger' :
+                      selectedOrder.ece_level === 2 ? 'danger' :
+                      selectedOrder.ece_level === 3 ? 'warning' :
+                      selectedOrder.ece_level === 4 ? 'info' : 'success'
+                    }>
+                      ECE-{selectedOrder.ece_level} - {
+                        selectedOrder.ece_level === 1 ? 'Life Threatening' :
+                        selectedOrder.ece_level === 2 ? 'Critical' :
+                        selectedOrder.ece_level === 3 ? 'Priority' :
+                        selectedOrder.ece_level === 4 ? 'Moderate' : 'Routine'
+                      }
                     </Badge>
                   </div>
                 </div>
@@ -271,8 +296,20 @@ export const LiveTracking: React.FC = () => {
                 ].map((step, idx) => {
                   const getStepState = () => {
                     const status = selectedOrder.status;
+                    
+                    const getNormalizedStatus = (s: string): string => {
+                      if (['Pending', 'Request Received', 'REQUEST_CREATED', 'AI_ANALYSIS_RUNNING', 'ECE_ASSIGNED', 'FACILITY_IDENTIFIED', 'PHARMACY_PENDING'].includes(s)) return 'Pending';
+                      if (['Under Review', 'PHARMACY_REVIEW', 'PHARMACY_ACCEPTED'].includes(s)) return 'Approved';
+                      if (['Approved', 'APPROVED'].includes(s)) return 'Approved';
+                      if (['Preparing', 'INVENTORY_RESERVED'].includes(s)) return 'Preparing';
+                      if (['Ready', 'Preparing Dispatch', 'Reached Store', 'DISPATCH_ASSIGNED', 'PICKED_UP'].includes(s)) return 'Ready';
+                      if (['Out for Delivery', 'Reached Customer', 'OUT_FOR_DELIVERY'].includes(s)) return 'Dispatched';
+                      if (['Delivered', 'COMPLETED', 'DELIVERED'].includes(s)) return 'Delivered';
+                      return 'Pending';
+                    };
+
                     const orderStages = ['Pending', 'Approved', 'Preparing', 'Ready', 'Dispatched', 'Delivered'];
-                    const currentIdx = orderStages.indexOf(status === 'Out for Delivery' ? 'Dispatched' : status === 'COMPLETED' ? 'Delivered' : status);
+                    const currentIdx = orderStages.indexOf(getNormalizedStatus(status));
                     
                     if (currentIdx >= idx) return 'completed';
                     if (currentIdx === idx - 1) return 'active';

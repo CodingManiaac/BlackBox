@@ -33,7 +33,7 @@ export const HospitalRequests: React.FC = () => {
           .map((o: any) => ({
             id: `BRQ-${o.id.substring(4)}`,
             dbOrderId: o.id,
-            facilityName: o.assigned_pharmacy || 'Central Red Cross Blood Bank',
+            facilityName: o.assigned_pharmacy || 'Red Cross Blood Bank',
             bloodType: o.medicine === 'O Negative' ? 'O-' : o.medicine,
             packsNeeded: o.quantity,
             priority: o.ece_level <= 2 ? 'Immediate' : 'Routine',

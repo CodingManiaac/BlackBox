@@ -10,16 +10,45 @@ import { Shield, AlertTriangle, Database } from 'lucide-react';
 export const Settings: React.FC = () => {
   const toastManager = useToast();
 
-  const [apiKey, setApiKey] = useState('GEMINI_API_KEY_SECURE_99201');
+  const [apiKey, setApiKey] = useState('');
   const [resetOpen, setResetOpen] = useState(false);
 
   // Feature Flags states
   const [enableDrones, setEnableDrones] = useState(true);
   const [enableAICache, setEnableAICache] = useState(true);
 
-  const saveSettings = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/api/system/config');
+        const data = await res.json();
+        if (data.success) {
+          setApiKey(data.geminiKey || '');
+        }
+      } catch (err) {
+        console.error('Failed to load system config:', err);
+      }
+    };
+    fetchConfig();
+  }, []);
+
+  const saveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    toastManager.addToast('Admin settings parameters saved successfully.', 'success');
+    try {
+      const res = await fetch('http://localhost:3001/api/system/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ geminiKey: apiKey })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toastManager.addToast('Admin settings parameters saved and persisted successfully.', 'success');
+      } else {
+        toastManager.addToast(data.message || 'Failed to save settings.', 'danger');
+      }
+    } catch (err) {
+      toastManager.addToast('Network error saving settings.', 'danger');
+    }
   };
 
   const executeDatabaseReset = () => {

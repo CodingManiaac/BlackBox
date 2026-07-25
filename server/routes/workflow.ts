@@ -23,11 +23,56 @@ router.get('/notifications', (req: Request, res: Response, next: NextFunction) =
   }
 });
 
+router.get('/notifications/role', (req: Request, res: Response, next: NextFunction) => {
+  const { role, recipientId } = req.query;
+  if (!role) {
+    res.status(400).json({ success: false, message: 'Missing role.' });
+    return;
+  }
+  try {
+    const list = NotificationEngine.getNotificationsForRole(String(role), recipientId ? String(recipientId) : null);
+    res.json({ success: true, notifications: list });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/notifications/:id/read', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    db.prepare('UPDATE notifications SET read = 1 WHERE id = ?').run(req.params.id);
+    res.json({ success: true, message: 'Notification marked as read.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/notifications/clear', (req: Request, res: Response, next: NextFunction) => {
+  const { role, recipientId } = req.body;
+  if (!role) {
+    res.status(400).json({ success: false, message: 'Missing role.' });
+    return;
+  }
+  try {
+    if (recipientId) {
+      db.prepare('DELETE FROM notifications WHERE recipient_role = ? AND (recipient_id = ? OR recipient_id IS NULL OR recipient_id = \'\')').run(role, recipientId);
+    } else {
+      db.prepare('DELETE FROM notifications WHERE recipient_role = ?').run(role);
+    }
+    res.json({ success: true, message: 'Notifications cleared.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/:id/accept', (req: Request, res: Response, next: NextFunction) => {
   const { facilityId, remarks } = req.body;
   try {
-    WorkflowOrchestrator.acceptRequest(req.params.id, facilityId || 'FAC-003', remarks);
-    res.json({ success: true, message: 'Request accepted and review started.' });
+    const success = WorkflowOrchestrator.acceptRequest(req.params.id, facilityId || 'FAC-003', remarks);
+    if (success) {
+      res.json({ success: true, message: 'Request accepted and review started.' });
+    } else {
+      res.status(409).json({ success: false, message: 'Conflict: This request has already been accepted by another facility.' });
+    }
   } catch (err) {
     next(err);
   }

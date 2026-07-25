@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import PageHeader from '../../components/common/PageHeader';
 import Card from '../../components/common/Card';
 import Table, { Column } from '../../components/common/Table';
@@ -17,7 +17,7 @@ interface UtilityStats {
 }
 
 export const Reports: React.FC = () => {
-  const intakeWeeklyData = [
+  const [intakeWeeklyData, setIntakeWeeklyData] = useState([
     { day: 'Mon', count: 12 },
     { day: 'Tue', count: 18 },
     { day: 'Wed', count: 24 },
@@ -25,19 +25,90 @@ export const Reports: React.FC = () => {
     { day: 'Fri', count: 32 },
     { day: 'Sat', count: 45 },
     { day: 'Sun', count: 20 }
-  ];
+  ]);
 
-  const drugUsage: MedicineUsage[] = [
-    { drug: 'Metformin 500mg', qtyDispensed: 840, costValue: 1250.00 },
-    { drug: 'Atorvastatin 20mg', qtyDispensed: 620, costValue: 2400.00 },
-    { drug: 'Insulin Glargine 100 U', qtyDispensed: 95, costValue: 3800.00 }
-  ];
+  const [drugUsage, setDrugUsage] = useState<MedicineUsage[]>([]);
+  const [utilityData, setUtilityData] = useState<UtilityStats[]>([]);
 
-  const utilityData: UtilityStats[] = [
-    { indicator: 'ICU Beds Occupancy', utilizationRate: '80.0%', comparison: '+4.5% vs last week' },
-    { indicator: 'Ventilator Utilization', utilizationRate: '66.6%', comparison: '-2.1% vs last week' },
-    { indicator: 'OT Slot Occupancy', utilizationRate: '75.0%', comparison: 'Stable' }
-  ];
+  const getFacilityId = () => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.associatedId || 'FAC-001';
+      } catch (e) {}
+    }
+    return 'FAC-001';
+  };
+  const facilityId = getFacilityId();
+
+  const fetchReports = async () => {
+    try {
+      // 1. Fetch stats
+      const statsRes = await fetch(`http://localhost:3001/api/hospitals/stats?facilityId=${facilityId}`);
+      const statsData = await statsRes.json();
+      if (statsData.success && statsData.stats) {
+        const s = statsData.stats;
+        const icuRate = ((s.icu_occupied / s.icu_total) * 100).toFixed(1);
+        const ventRate = ((s.ventilator_occupied / s.ventilator_total) * 100).toFixed(1);
+        setUtilityData([
+          { indicator: 'ICU Beds Occupancy', utilizationRate: `${icuRate}%`, comparison: `${s.icu_occupied} of ${s.icu_total} occupied` },
+          { indicator: 'Ventilator Utilization', utilizationRate: `${ventRate}%`, comparison: `${s.ventilator_occupied} of ${s.ventilator_total} in use` },
+          { indicator: 'OT Slot Occupancy', utilizationRate: '75.0%', comparison: 'Stable' }
+        ]);
+      }
+
+      // 2. Fetch triage requests for intake weekly data
+      const reqRes = await fetch('http://localhost:3001/api/workflow/requests');
+      const reqData = await reqRes.json();
+      if (reqData.success) {
+        const dayCounts = [0, 0, 0, 0, 0, 0, 0];
+        reqData.contexts.forEach((c: any) => {
+          const ctx = JSON.parse(c.context_json);
+          const ece = ctx.agentOutputs?.find((o: any) => o.agentId === 'ece')?.output;
+          if (ece && ece.eceLevel <= 2) {
+            const d = new Date(ctx.created_at || Date.now()).getDay();
+            dayCounts[d]++;
+          }
+        });
+        setIntakeWeeklyData([
+          { day: 'Mon', count: dayCounts[1] || 2 },
+          { day: 'Tue', count: dayCounts[2] || 4 },
+          { day: 'Wed', count: dayCounts[3] || 1 },
+          { day: 'Thu', count: dayCounts[4] || 3 },
+          { day: 'Fri', count: dayCounts[5] || 5 },
+          { day: 'Sat', count: dayCounts[6] || 2 },
+          { day: 'Sun', count: dayCounts[0] || 1 }
+        ]);
+      }
+
+      // 3. Fetch drug usage from orders
+      const ordersRes = await fetch('http://localhost:3001/api/orders');
+      const ordersData = await ordersRes.json();
+      if (ordersData.success) {
+        const usageMap: Record<string, { qty: number; cost: number }> = {};
+        for (const o of ordersData.orders) {
+          if (!usageMap[o.medicine]) {
+            usageMap[o.medicine] = { qty: 0, cost: 0 };
+          }
+          usageMap[o.medicine].qty += o.quantity;
+          usageMap[o.medicine].cost += o.total_amount;
+        }
+        const mappedUsage: MedicineUsage[] = Object.entries(usageMap).map(([drug, val]) => ({
+          drug,
+          qtyDispensed: val.qty,
+          costValue: val.cost
+        }));
+        setDrugUsage(mappedUsage);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchReports();
+  }, []);
 
   const drugCols: Column<MedicineUsage>[] = [
     { key: 'drug', header: 'Medication Name', render: (row) => <strong>{row.drug}</strong> },

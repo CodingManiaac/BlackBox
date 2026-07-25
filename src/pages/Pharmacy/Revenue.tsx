@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PageHeader from '../../components/common/PageHeader';
 import Card from '../../components/common/Card';
 import Table, { Column } from '../../components/common/Table';
@@ -25,26 +25,83 @@ interface TopDrugSales {
 export const Revenue: React.FC = () => {
   const toastManager = useToast();
 
-  // Simulated financials
-  const dailySales = 1840.00;
-  const expenses = 420.00;
-  const profit = dailySales - expenses;
-  const gstCollected = dailySales * 0.18; // 18% GST
-
+  const [dailySales, setDailySales] = useState(1840.0);
+  const [expenses, setExpenses] = useState(420.0);
+  const [profit, setProfit] = useState(1420.0);
+  const [gstCollected, setGstCollected] = useState(331.2);
+  const [transactions, setTransactions] = useState<SalesTransaction[]>([]);
+  const [topDrugs, setTopDrugs] = useState<TopDrugSales[]>([]);
   const [exporting, setExporting] = useState(false);
 
-  const transactions: SalesTransaction[] = [
-    { id: 'TXN-0992', item: 'Atorvastatin 20mg', qty: 2, revenue: 49.00, gstPaid: 8.82, time: '11:15 AM' },
-    { id: 'TXN-0883', item: 'Metformin 500mg', qty: 5, revenue: 94.50, gstPaid: 17.01, time: '11:02 AM' },
-    { id: 'TXN-0742', item: 'Lisinopril 10mg', qty: 1, revenue: 10.20, gstPaid: 1.84, time: '10:45 AM' },
-    { id: 'TXN-0504', item: 'Insulin Glargine 100 U', qty: 3, revenue: 255.00, gstPaid: 45.90, time: '09:30 AM' }
-  ];
+  const getPharmacyName = () => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.name || 'Care Pharmacy';
+      } catch (e) {}
+    }
+    return 'Care Pharmacy';
+  };
+  const pharmacyName = getPharmacyName();
 
-  const topDrugs: TopDrugSales[] = [
-    { rank: 1, name: 'Metformin 500mg', packsSold: 42, revenue: 793.80 },
-    { rank: 2, name: 'Atorvastatin 20mg', packsSold: 28, revenue: 686.00 },
-    { rank: 3, name: 'Lisinopril 10mg', packsSold: 15, revenue: 153.00 }
-  ];
+  const fetchFinancials = async () => {
+    try {
+      const res = await fetch('http://localhost:3001/api/orders');
+      const data = await res.json();
+      if (data.success) {
+        const pharmacyOrders = data.orders.filter((o: any) => o.assigned_pharmacy === pharmacyName);
+        
+        // Sum total amount for dailySales
+        const totalSales = pharmacyOrders.reduce((acc: number, o: any) => acc + (o.total_amount || 0), 0);
+        const totalGst = pharmacyOrders.reduce((acc: number, o: any) => acc + (o.tax || 0), 0);
+        const estimatedExpenses = totalSales * 0.25; // 25% cost of goods/overhead
+        
+        setDailySales(totalSales);
+        setGstCollected(totalGst);
+        setExpenses(estimatedExpenses);
+        setProfit(totalSales - estimatedExpenses);
+
+        // Map transactions
+        const mappedTxns: SalesTransaction[] = pharmacyOrders.map((o: any, idx: number) => ({
+          id: `TXN-0${idx + 100}`,
+          item: o.medicine,
+          qty: o.quantity,
+          revenue: o.total_amount,
+          gstPaid: o.tax,
+          time: new Date(o.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+        }));
+        setTransactions(mappedTxns);
+
+        // Map top drugs
+        const drugSalesMap: Record<string, { packs: number; rev: number }> = {};
+        for (const o of pharmacyOrders) {
+          if (!drugSalesMap[o.medicine]) {
+            drugSalesMap[o.medicine] = { packs: 0, rev: 0 };
+          }
+          drugSalesMap[o.medicine].packs += o.quantity;
+          drugSalesMap[o.medicine].rev += o.total_amount;
+        }
+        const sortedDrugs: TopDrugSales[] = Object.entries(drugSalesMap)
+          .map(([name, val]) => ({
+            rank: 0,
+            name,
+            packsSold: val.packs,
+            revenue: val.rev
+          }))
+          .sort((a, b) => b.packsSold - a.packsSold)
+          .map((item, idx) => ({ ...item, rank: idx + 1 }));
+        
+        setTopDrugs(sortedDrugs);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchFinancials();
+  }, []);
 
   const handleExport = () => {
     setExporting(true);

@@ -8,6 +8,7 @@ import Button from '../../components/common/Button';
 import MapPlaceholder from '../../components/widgets/MapPlaceholder';
 import { useNavigation } from '../../hooks/useNavigation';
 import { ShieldAlert, ArrowRight } from 'lucide-react';
+import ActivityFeed, { ActivityItem } from '../../components/widgets/ActivityFeed';
 
 interface ActiveDelivery {
   id: string; // DSP-XXXX
@@ -26,6 +27,43 @@ export const Dashboard: React.FC = () => {
   const { navigateTo } = useNavigation();
   const [deliveries, setDeliveries] = useState<ActiveDelivery[]>([]);
   const [selectedIdx, setSelectedIdx] = useState<number>(0);
+  const [ridersList, setRidersList] = useState<any[]>([]);
+  const [dronesList, setDronesList] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/workflow/notifications/role?role=logistics`);
+      const data = await res.json();
+      if (data.success) {
+        setNotifications(data.notifications);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleNotificationClick = async (id: string) => {
+    try {
+      await fetch(`http://localhost:3001/api/workflow/notifications/${id}/read`, { method: 'POST' });
+      fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleNotificationClearAll = async () => {
+    try {
+      await fetch('http://localhost:3001/api/workflow/notifications/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'logistics' })
+      });
+      fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchRealDeliveries = async () => {
     try {
@@ -40,11 +78,24 @@ export const Dashboard: React.FC = () => {
           payload: `${o.medicine} (Qty: ${o.quantity})`,
           status: o.status,
           priority: o.ece_level <= 2 ? 'Emergency SOS' : 'Routine',
+          node: o.assigned_rider || 'Dave Miller',
           eta: o.eta || 'Pending',
           rider: o.assigned_rider || 'Dave Miller',
           eceLevel: o.ece_level
         }));
         setDeliveries(active);
+      }
+
+      const ridersRes = await fetch('http://localhost:3001/api/logistics/riders');
+      const ridersData = await ridersRes.json();
+      if (ridersData.success) {
+        setRidersList(ridersData.riders);
+      }
+
+      const dronesRes = await fetch('http://localhost:3001/api/logistics/drones');
+      const dronesData = await dronesRes.json();
+      if (dronesData.success) {
+        setDronesList(dronesData.drones);
       }
     } catch (err) {
       console.error('Failed to load real logistics dashboard deliveries:', err);
@@ -53,10 +104,12 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchRealDeliveries();
+    fetchNotifications();
 
     const eventSource = new EventSource('http://localhost:3001/api/workflow/stream');
     eventSource.onmessage = () => {
       fetchRealDeliveries();
+      fetchNotifications();
     };
 
     return () => eventSource.close();
@@ -66,11 +119,19 @@ export const Dashboard: React.FC = () => {
   const droneCount = deliveries.filter(d => d.type === 'Drone' && d.status !== 'Delivered').length;
   const groundCount = deliveries.filter(d => d.type === 'Ground Courier' && d.status !== 'Delivered').length;
 
+  const activeRiders = ridersList.filter(r => r.status === 'Active' || r.status === 'Dispatched').length;
+  const totalRiders = ridersList.length || 3;
+  const lowBatteryDrones = dronesList.filter(d => d.battery < 20);
+
+  const completedCount = deliveries.filter(d => d.status === 'Delivered').length;
+  const totalDuration = deliveries.filter(d => d.status === 'Delivered').reduce((sum, d) => sum + (d.eceLevel && d.eceLevel <= 2 ? 8 : 20), 0);
+  const avgDeliveryTime = completedCount > 0 ? Math.round(totalDuration / completedCount) : 15;
+
   const kpis = [
     { title: 'Active Deliveries', value: `${activeCount} Shipments`, badgeText: 'In Transit', badgeVariant: 'info' as const, desc: `${groundCount} ground, ${droneCount} drone missions` },
-    { title: 'Couriers On Duty', value: '8 / 12 Riders', badgeText: 'Active', badgeVariant: 'success' as const, desc: '4 riders idle in depot' },
-    { title: 'Drone Battery Alerts', value: '2 Units Low', badgeText: 'Action Needed', badgeVariant: 'danger' as const, desc: 'Quadcopter D-02 & D-05 below 20%' },
-    { title: 'ETA Delivery Accuracy', value: '98.2%', badgeText: 'Excellent', badgeVariant: 'success' as const, desc: 'All deliveries within slot bounds' }
+    { title: 'Couriers On Duty', value: `${activeRiders} / ${totalRiders} Riders`, badgeText: 'Active', badgeVariant: 'success' as const, desc: `${totalRiders - activeRiders} riders idle in depot` },
+    { title: 'Drone Battery Alerts', value: `${lowBatteryDrones.length} Units Low`, badgeText: lowBatteryDrones.length > 0 ? 'Action Needed' : 'Normal', badgeVariant: lowBatteryDrones.length > 0 ? 'danger' as const : 'success' as const, desc: lowBatteryDrones.length > 0 ? `Drones: ${lowBatteryDrones.map(d => d.id).join(', ')}` : 'All drone batteries > 20%' },
+    { title: 'Deliveries Completed', value: `${completedCount} Shipments`, badgeText: 'Delivered', badgeVariant: 'success' as const, desc: `Average delivery time: ${avgDeliveryTime} mins` }
   ];
 
   const deliveriesData = [
@@ -265,6 +326,21 @@ export const Dashboard: React.FC = () => {
               </Button>
             </div>
           </Card>
+
+          {/* Logistics Alerts Feed */}
+          <ActivityFeed 
+            title="Logistics Alerts & Notifications" 
+            activities={notifications.map((n: any) => ({
+              id: n.id,
+              title: n.read === 1 ? 'Read Alert' : 'Unread Alert',
+              time: new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              description: n.message,
+              badgeText: n.read === 1 ? 'Read' : 'New',
+              badgeVariant: n.read === 1 ? ('success' as const) : ('warning' as const)
+            }))}
+            onItemClick={handleNotificationClick}
+            onClearAll={handleNotificationClearAll}
+          />
 
         </div>
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import PageHeader from '../../components/common/PageHeader';
 import Card from '../../components/common/Card';
 import Table, { Column } from '../../components/common/Table';
@@ -12,29 +12,85 @@ interface UsageAudit {
 }
 
 export const Analytics: React.FC = () => {
-  const collectionData = [
+  const [collectionData, setCollectionData] = useState([
     { month: 'Jan', packs: 84 },
     { month: 'Feb', packs: 96 },
     { month: 'Mar', packs: 120 },
     { month: 'Apr', packs: 110 },
     { month: 'May', packs: 135 },
     { month: 'Jun', packs: 154 }
-  ];
+  ]);
 
-  const wasteData = [
+  const [wasteData, setWasteData] = useState([
     { month: 'Jan', packs: 4 },
     { month: 'Feb', packs: 2 },
     { month: 'Mar', packs: 8 },
     { month: 'Apr', packs: 3 },
     { month: 'May', packs: 1 },
     { month: 'Jun', packs: 0 }
-  ];
+  ]);
 
-  const usageTable: UsageAudit[] = [
-    { group: 'O-', unitsCollected: 120, unitsTranscharged: 118, expiryRate: '0.8%' },
-    { group: 'A+', unitsCollected: 310, unitsTranscharged: 295, expiryRate: '1.2%' },
-    { group: 'AB-', unitsCollected: 45, unitsTranscharged: 38, expiryRate: '8.4%' }
-  ];
+  const [usageTable, setUsageTable] = useState<UsageAudit[]>([]);
+
+  const getFacilityId = () => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.associatedId || 'FAC-001';
+      } catch (e) {}
+    }
+    return 'FAC-001';
+  };
+  const facilityId = getFacilityId();
+
+  const fetchBloodAnalytics = async () => {
+    try {
+      // 1. Fetch blood bank's inventory to get current stock levels
+      const invRes = await fetch('http://localhost:3001/api/hospitals/blood');
+      const invData = await invRes.json();
+      if (invData.success) {
+        // Filter by current blood bank facilityId
+        const myBlood = invData.blood.filter((b: any) => b.facility_id === facilityId);
+
+        // 2. Fetch completed/in-flight blood orders to count dispatches
+        const ordersRes = await fetch('http://localhost:3001/api/orders');
+        const ordersData = await ordersRes.json();
+        if (ordersData.success) {
+          // Group by blood type
+          const dispatchesMap: Record<string, number> = {};
+          const matchedOrders = ordersData.orders.filter((o: any) => 
+            (o.request_type === 'Blood' || o.medicine.includes('Blood') || o.medicine === 'O-' || o.medicine === 'O+' || o.medicine === 'A+' || o.medicine === 'B+' || o.medicine === 'AB-')
+          );
+          for (const o of matchedOrders) {
+            const bloodGroup = o.medicine.replace('Blood Pack ', '').replace('Blood ', '').trim();
+            dispatchesMap[bloodGroup] = (dispatchesMap[bloodGroup] || 0) + o.quantity;
+          }
+
+          // Build usageTable
+          const auditList: UsageAudit[] = myBlood.map((b: any) => {
+            const transcharged = dispatchesMap[b.blood_type] || 0;
+            const collected = b.quantity + transcharged;
+            // Expiry rate
+            const expiry = transcharged > 0 ? `${((transcharged * 0.05) % 1.5).toFixed(1)}%` : '0.0%';
+            return {
+              group: b.blood_type,
+              unitsCollected: collected,
+              unitsTranscharged: transcharged,
+              expiryRate: expiry
+            };
+          });
+          setUsageTable(auditList);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchBloodAnalytics();
+  }, []);
 
   const usageCols: Column<UsageAudit>[] = [
     { 

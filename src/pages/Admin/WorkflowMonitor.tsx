@@ -173,31 +173,33 @@ export const WorkflowMonitor: React.FC = () => {
           const updated = [...prev];
           if (step > 0) {
             const prevAgent = updated[step - 1];
-            prevAgent.status = 'Completed';
-            
-            if (contextObj) {
-              const actualOut = contextObj.agentOutputs?.find((o: any) => o.agentId === prevAgent.id);
-              prevAgent.latencyMs = actualOut?.latencyMs || Math.floor(40 + Math.random() * 80);
-              prevAgent.confidence = actualOut?.confidence || Math.floor(90 + Math.random() * 9);
-            } else {
-              prevAgent.latencyMs = Math.floor(40 + Math.random() * 80);
-              prevAgent.confidence = Math.floor(90 + Math.random() * 9);
-            }
-            prevAgent.timestamp = new Date().toLocaleTimeString();
-            setTotalPipelineTime(t => t + prevAgent.latencyMs);
+            if (prevAgent) {
+              prevAgent.status = 'Completed';
+              
+              if (contextObj) {
+                const actualOut = contextObj.agentOutputs?.find((o: any) => o.agentId === prevAgent.id);
+                prevAgent.latencyMs = actualOut?.latencyMs || Math.floor(40 + Math.random() * 80);
+                prevAgent.confidence = actualOut?.confidence || Math.floor(90 + Math.random() * 9);
+              } else {
+                prevAgent.latencyMs = Math.floor(40 + Math.random() * 80);
+                prevAgent.confidence = Math.floor(90 + Math.random() * 9);
+              }
+              prevAgent.timestamp = new Date().toLocaleTimeString();
+              setTotalPipelineTime(t => t + prevAgent.latencyMs);
 
-            setEvents(e => [
-              {
-                type: 'AGENT_FINISHED' as any,
-                timestamp: Date.now(),
-                requestId: contextObj?.requestId || 'REQ-SIM',
-                payload: {
-                  agentId: prevAgent.name,
-                  message: `Agent execution resolved. Confidence: ${prevAgent.confidence}%`
-                }
-              },
-              ...e
-            ]);
+              setEvents(e => [
+                {
+                  type: 'AGENT_FINISHED' as any,
+                  timestamp: Date.now(),
+                  requestId: contextObj?.requestId || 'REQ-SIM',
+                  payload: {
+                    agentId: prevAgent.name,
+                    message: `Agent execution resolved. Confidence: ${prevAgent.confidence}%`
+                  }
+                },
+                ...e
+              ]);
+            }
           }
           
           const currAgent = updated[step];
@@ -502,6 +504,11 @@ export const WorkflowMonitor: React.FC = () => {
   }, []);
 
   const selectScenario = (idx: number) => {
+    if (idx === -1) {
+      setQuery('');
+      setPatientId('PAT-001');
+      return;
+    }
     const scenario = patientScenarios.scenarios[idx];
     setQuery(scenario.query);
     setPatientId(scenario.patientId);
@@ -601,6 +608,7 @@ export const WorkflowMonitor: React.FC = () => {
                   }}
                   disabled={isRunning}
                 >
+                  <option value="-1">Custom / Free Text Query</option>
                   {patientScenarios.scenarios.map((sc, idx) => (
                     <option key={idx} value={idx}>
                       {sc.patientId} - {sc.query.substring(0, 45)}...
@@ -1076,7 +1084,7 @@ export const WorkflowMonitor: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--color-border)', paddingBottom: '6px' }}>
                   <span className="medx-caption">Routed Facility</span>
-                  <strong>{lastContext.explainabilityReport?.facilityName || 'Care Pharmacy Store'}</strong>
+                  <strong>{lastContext.explainabilityReport?.facilityName || 'Care Pharmacy'}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--color-border)', paddingBottom: '6px' }}>
                   <span className="medx-caption">Calculated Transit ETA</span>

@@ -5,7 +5,6 @@ import Button from '../../components/common/Button';
 import Badge from '../../components/common/Badge';
 import { useToast } from '../../hooks/useToast';
 import { Send, Bot, Volume2, Globe, Sparkles } from 'lucide-react';
-import { GeminiProvider } from '../../integrations/GeminiProvider';
 
 interface ChatMessage {
   id: string;
@@ -28,12 +27,42 @@ export const AIAssistant: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [speakerActive, setSpeakerActive] = useState(false);
 
-  // Initialize greeting on language toggle
+  const getPatientId = () => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.associatedId || 'PAT-001';
+      } catch (e) {}
+    }
+    return 'PAT-001';
+  };
+  
+  const patientId = getPatientId();
+
+  // Load initial messages from localStorage or default greeting
   useEffect(() => {
+    const saved = localStorage.getItem(`medx_chat_messages_${patientId}`);
+    if (saved) {
+      try {
+        setMessages(JSON.parse(saved));
+        return;
+      } catch (e) {}
+    }
     setMessages([
       { id: 'greet', sender: 'ai', text: GREETINGS[language] }
     ]);
-  }, [language]);
+  }, [language, patientId]);
+
+  // Persist messages to localStorage on change
+  useEffect(() => {
+    if (messages.length > 0) {
+      if (messages.length === 1 && messages[0].id === 'greet') {
+        return;
+      }
+      localStorage.setItem(`medx_chat_messages_${patientId}`, JSON.stringify(messages));
+    }
+  }, [messages, patientId]);
 
   const handleSend = (text = inputText) => {
     const trimmed = text.trim();
@@ -68,28 +97,20 @@ AI:`;
     (async () => {
       let responseText = '';
       try {
-        responseText = await GeminiProvider.generateContent(prompt);
-      } catch (err) {
-        console.warn('Gemini unavailable. Running local keyword fallback rules parser...', err);
-        if (language === 'en') {
-          if (trimmed.toLowerCase().includes('metformin')) {
-            responseText = 'Metformin 500mg is an oral antidiabetic drug. Take it with meals to minimize gastrointestinal discomfort. Avoid taking it with high amounts of alcohol, as it elevates the risk of lactic acidosis.';
-          } else if (trimmed.toLowerCase().includes('cough') || trimmed.toLowerCase().includes('lisinopril')) {
-            responseText = 'A dry cough can be a common side effect of Lisinopril (ACE inhibitor). If you started taking Zestril/Lisinopril recently, this side effect is well-documented. Please contact Dr. Jenkins to evaluate alternative drugs (ARBs).';
-          } else if (trimmed.toLowerCase().includes('blood') || trimmed.toLowerCase().includes('o negative') || trimmed.toLowerCase().includes('o-')) {
-            responseText = 'Central Red Cross Blood Bank currently has stock of O- negative blood group. You can reserve units from the Blood Search registry panel.';
-          } else if (trimmed.toLowerCase().includes('chest pain') || trimmed.toLowerCase().includes('emergency') || trimmed.toLowerCase().includes('breathing')) {
-            responseText = 'WARNING: Your symptoms indicate a potential high-severity emergency. Please rest immediately and activate the SOS EMERGENCY DISPATCH console on the top menu bar right away!';
-          } else {
-            responseText = 'I have recorded your clinical query. While I parse your wearable health telemetry streams, please rest. If symptoms worsen, activate the emergency SOS dispatch console immediately.';
-          }
-        } else if (language === 'es') {
-          responseText = 'He registrado su consulta clínica. Mientras analizamos sus datos de telemetría de salud, descanse. Si los síntomas empeoran, active el SOS inmediatamente.';
-        } else if (language === 'hi') {
-          responseText = 'मैंने आपकी नैदानिक पूछताछ दर्ज कर ली है। जब हम आपके स्वास्थ्य टेलीमेट्री डेटा का विश्लेषण करते हैं, कृपया आराम करें। यदि लक्षण बिगड़ते हैं, तो तुरंत आपातकालीन एसओएस सक्रिय करें।';
+        const res = await fetch('http://localhost:3001/api/system/chat-assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+        const data = await res.json();
+        if (data.success && data.text) {
+          responseText = data.text;
         } else {
-          responseText = 'J\'ai enregistré votre requête clinique. Pendant que nous analysons vos données de télémétrie, veuillez vous reposer. Si les symptômes s\'aggravent, activez l\'SOS immédiatement.';
+          throw new Error(data.message || 'Failed to fetch AI response');
         }
+      } catch (err: any) {
+        console.error('Gemini error:', err);
+        responseText = `Gemini API Error: ${err.message || 'Connection failed'}. Please verify that the "Generative Language API" is enabled for your project key in Google AI Studio.`;
       }
 
       const aiMsg: ChatMessage = {

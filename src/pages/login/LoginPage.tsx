@@ -14,6 +14,59 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Sign Up states
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [signUpName, setSignUpName] = useState('');
+  const [signUpEmail, setSignUpEmail] = useState('');
+  const [signUpPassword, setSignUpPassword] = useState('');
+  const [signUpPhone, setSignUpPhone] = useState('');
+  const [signUpAddress, setSignUpAddress] = useState('');
+  const [signUpEmergency, setSignUpEmergency] = useState('');
+
+  const handleSignUpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!signUpName || !signUpEmail || !signUpPassword || !signUpPhone || !signUpAddress || !signUpEmergency) {
+      addToast('All registration fields are required.', 'warning');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('http://localhost:3001/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: signUpName,
+          email: signUpEmail,
+          password: signUpPassword,
+          phone: signUpPhone,
+          address: signUpAddress,
+          emergencyContact: signUpEmergency
+        })
+      });
+      const data = await response.json();
+      setIsLoading(false);
+
+      if (response.ok && data.success) {
+        addToast('Registration successful! Please log in.', 'success');
+        setIsSignUp(false);
+        setUsername(signUpEmail);
+        setSignUpName('');
+        setSignUpEmail('');
+        setSignUpPassword('');
+        setSignUpPhone('');
+        setSignUpAddress('');
+        setSignUpEmergency('');
+      } else {
+        addToast(data.message || 'Registration failed.', 'error');
+      }
+    } catch (err) {
+      setIsLoading(false);
+      console.error('[SignUp] API failed:', err);
+      addToast('Cannot connect to registration service.', 'error');
+    }
+  };
+
   // Map subpaths to role names
   const roleMapping: Record<string, { label: string; desc: string; iconName: string; color: string; defaultUser: string }> = {
     '/login/patient': { label: 'Patient Portal', desc: 'Secure patient diagnostic intake & retail prescription checkout.', iconName: 'Heart', color: '#EF4444', defaultUser: 'patient_demo' },
@@ -350,7 +403,13 @@ export const LoginPage: React.FC = () => {
               
               {/* Back Button */}
               <button 
-                onClick={() => navigateTo('/login')}
+                onClick={() => {
+                  if (isSignUp) {
+                    setIsSignUp(false);
+                  } else {
+                    navigateTo('/login');
+                  }
+                }}
                 style={{
                   alignSelf: 'flex-start',
                   background: 'none',
@@ -366,7 +425,7 @@ export const LoginPage: React.FC = () => {
                 }}
               >
                 <Icons.ArrowLeft size={14} />
-                Back to workspaces
+                {isSignUp ? 'Back to Login' : 'Back to workspaces'}
               </button>
 
               <div style={{
@@ -390,189 +449,300 @@ export const LoginPage: React.FC = () => {
                     color: '#2563EB',
                     boxShadow: '0 4px 6px -1px rgba(37,99,235,0.05)'
                   }}>
-                    <Icons.Lock size={20} />
+                    {isSignUp ? <Icons.UserPlus size={20} /> : <Icons.Lock size={20} />}
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
-                      Sign In to {currentRole.label.split(' ')[0]}
-                    </h2>
-                    <p style={{ fontSize: '11px', color: '#64748B', marginTop: '6px', lineHeight: 1.4, padding: '0 12px' }}>
-                      {currentRole.desc}
-                    </p>
+                    {isSignUp ? (
+                      <>
+                        <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                          Patient Registration
+                        </h2>
+                        <p style={{ fontSize: '11px', color: '#64748B', marginTop: '6px', lineHeight: 1.4, padding: '0 12px' }}>
+                          Create your MedXNet account to access healthcare resources.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                          Sign In to {currentRole.label.split(' ')[0]}
+                        </h2>
+                        <p style={{ fontSize: '11px', color: '#64748B', marginTop: '6px', lineHeight: 1.4, padding: '0 12px' }}>
+                          {currentRole.desc}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                {/* Continue with Google */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const isGoogleConfigured = typeof import.meta !== 'undefined' && import.meta.env && !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
-                    if (!isGoogleConfigured) {
-                      addToast('Google Sign-In is currently unavailable because the API keys/configuration are missing.', 'warning');
-                    } else {
-                      // Google Authentication logic goes here
-                      addToast('Initiating Google Sign-In...', 'info');
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '10px 16px',
-                    backgroundColor: 'white',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    color: '#374151',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    cursor: (typeof import.meta !== 'undefined' && import.meta.env && !!import.meta.env.VITE_GOOGLE_CLIENT_ID) ? 'pointer' : 'not-allowed',
-                    opacity: (typeof import.meta !== 'undefined' && import.meta.env && !!import.meta.env.VITE_GOOGLE_CLIENT_ID) ? 1 : 0.6,
-                    transition: 'background-color 0.2s ease'
-                  }}
-                  onMouseEnter={e => {
-                    const isGoogleConfigured = typeof import.meta !== 'undefined' && import.meta.env && !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
-                    if (isGoogleConfigured) e.currentTarget.style.backgroundColor = '#F9FAFB';
-                  }}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'white'}
-                >
-                  {/* Styled G Icon */}
-                  <svg style={{ width: '16px', height: '16px' }} viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.13-5.136 4.13A5.785 5.785 0 0 1 8.2 12.75a5.785 5.785 0 0 1 5.79-5.785c2.476 0 4.546 1.583 5.292 3.793l3.96-3.076C20.912 3.72 16.892 1.18 13.99 1.18 7.915 1.18 3 6.095 3 12.17s4.915 10.99 10.99 10.99c6.438 0 11.233-4.524 11.233-11.232 0-.616-.062-1.218-.178-1.796H12.24Z" />
-                  </svg>
-                  {(typeof import.meta !== 'undefined' && import.meta.env && !!import.meta.env.VITE_GOOGLE_CLIENT_ID) ? 'Continue with Google' : 'Google Sign-In unavailable.'}
-                </button>
-
-                {/* Divider OR */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '20px 0' }}>
-                  <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }}></div>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.5px' }}>OR</span>
-                  <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }}></div>
-                </div>
-
-                {/* Form fields */}
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
-                      Email / Username
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <Icons.User size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94A3B8' }} />
+                {isSignUp ? (
+                  /* SIGN UP FORM */
+                  <form onSubmit={handleSignUpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Full Name</label>
                       <input 
                         type="text" 
-                        value={username}
-                        onChange={e => setUsername(e.target.value)}
-                        placeholder="Enter your email or username"
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px 10px 38px',
-                          borderRadius: '6px',
-                          border: '1px solid #D1D5DB',
-                          backgroundColor: '#FFFFFF',
-                          color: '#0F172A',
-                          fontSize: '13px',
-                          outline: 'none'
-                        }}
+                        value={signUpName} 
+                        onChange={e => setSignUpName(e.target.value)} 
+                        placeholder="e.g. John Doe"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '13px', outline: 'none' }}
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
-                      Password
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <Icons.Lock size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94A3B8' }} />
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Email Address</label>
                       <input 
-                        type={showPassword ? 'text' : 'password'} 
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        placeholder="Enter your password"
+                        type="email" 
+                        value={signUpEmail} 
+                        onChange={e => setSignUpEmail(e.target.value)} 
+                        placeholder="vishu@medxnet.hq"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '13px', outline: 'none' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Password</label>
+                      <input 
+                        type="password" 
+                        value={signUpPassword} 
+                        onChange={e => setSignUpPassword(e.target.value)} 
+                        placeholder="••••••••"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '13px', outline: 'none' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Phone Number</label>
+                      <input 
+                        type="text" 
+                        value={signUpPhone} 
+                        onChange={e => setSignUpPhone(e.target.value)} 
+                        placeholder="+91-9988776655"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '13px', outline: 'none' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Home Address</label>
+                      <input 
+                        type="text" 
+                        value={signUpAddress} 
+                        onChange={e => setSignUpAddress(e.target.value)} 
+                        placeholder="128 Main St, New York"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '13px', outline: 'none' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Emergency Contact Details</label>
+                      <input 
+                        type="text" 
+                        value={signUpEmergency} 
+                        onChange={e => setSignUpEmergency(e.target.value)} 
+                        placeholder="Spouse: +91-9988776644"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '13px', outline: 'none' }}
+                      />
+                    </div>
+                    <Button 
+                      type="submit" 
+                      disabled={isLoading}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        backgroundColor: '#10B981',
+                        border: 'none',
+                        color: 'white',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        marginTop: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(16,185,129,0.2)'
+                      }}
+                    >
+                      {isLoading ? 'Creating Account...' : 'Register Account'}
+                    </Button>
+                    <div style={{ textAlign: 'center', fontSize: '11px', color: '#64748B', marginTop: '10px' }}>
+                      Already have an account? <span onClick={() => setIsSignUp(false)} style={{ fontWeight: 600, color: '#2563EB', cursor: 'pointer' }}>Sign In here</span>
+                    </div>
+                  </form>
+                ) : (
+                  /* SIGN IN FORM */
+                  <>
+                    {/* Continue with Google */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const isGoogleConfigured = typeof import.meta !== 'undefined' && import.meta.env && !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
+                        if (!isGoogleConfigured) {
+                          addToast('Google Sign-In is currently unavailable because the API keys/configuration are missing.', 'warning');
+                        } else {
+                          addToast('Initiating Google Sign-In...', 'info');
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        backgroundColor: 'white',
+                        border: '1px solid #D1D5DB',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        color: '#374151',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        cursor: (typeof import.meta !== 'undefined' && import.meta.env && !!import.meta.env.VITE_GOOGLE_CLIENT_ID) ? 'pointer' : 'not-allowed',
+                        opacity: (typeof import.meta !== 'undefined' && import.meta.env && !!import.meta.env.VITE_GOOGLE_CLIENT_ID) ? 1 : 0.6,
+                        transition: 'background-color 0.2s ease'
+                      }}
+                      onMouseEnter={e => {
+                        const isGoogleConfigured = typeof import.meta !== 'undefined' && import.meta.env && !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
+                        if (isGoogleConfigured) e.currentTarget.style.backgroundColor = '#F9FAFB';
+                      }}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'white'}
+                    >
+                      {/* Styled G Icon */}
+                      <svg style={{ width: '16px', height: '16px' }} viewBox="0 0 24 24">
+                        <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.13-5.136 4.13A5.785 5.785 0 0 1 8.2 12.75a5.785 5.785 0 0 1 5.79-5.785c2.476 0 4.546 1.583 5.292 3.793l3.96-3.076C20.912 3.72 16.892 1.18 13.99 1.18 7.915 1.18 3 6.095 3 12.17s4.915 10.99 10.99 10.99c6.438 0 11.233-4.524 11.233-11.232 0-.616-.062-1.218-.178-1.796H12.24Z" />
+                      </svg>
+                      {(typeof import.meta !== 'undefined' && import.meta.env && !!import.meta.env.VITE_GOOGLE_CLIENT_ID) ? 'Continue with Google' : 'Google Sign-In unavailable.'}
+                    </button>
+
+                    {/* Divider OR */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '20px 0' }}>
+                      <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }}></div>
+                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.5px' }}>OR</span>
+                      <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }}></div>
+                    </div>
+
+                    {/* Form fields */}
+                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                          Email / Username
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                          <Icons.User size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94A3B8' }} />
+                          <input 
+                            type="text" 
+                            value={username}
+                            onChange={e => setUsername(e.target.value)}
+                            placeholder="Enter your email or username"
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px 10px 38px',
+                              borderRadius: '6px',
+                              border: '1px solid #D1D5DB',
+                              backgroundColor: '#FFFFFF',
+                              color: '#0F172A',
+                              fontSize: '13px',
+                              outline: 'none'
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                          Password
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                          <Icons.Lock size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94A3B8' }} />
+                          <input 
+                            type={showPassword ? 'text' : 'password'} 
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            placeholder="Enter your password"
+                            style={{
+                              width: '100%',
+                              padding: '10px 38px 10px 38px',
+                              borderRadius: '6px',
+                              border: '1px solid #D1D5DB',
+                              backgroundColor: '#FFFFFF',
+                              color: '#0F172A',
+                              fontSize: '13px',
+                              outline: 'none'
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            style={{
+                              position: 'absolute',
+                              right: '12px',
+                              top: '12px',
+                              background: 'none',
+                              border: 'none',
+                              color: '#94A3B8',
+                              cursor: 'pointer',
+                              padding: 0
+                            }}
+                          >
+                            {showPassword ? <Icons.EyeOff size={16} /> : <Icons.Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Remember & forgot password link */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                          <input type="checkbox" style={{ cursor: 'pointer' }} />
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>Remember me</span>
+                        </label>
+                        <a href="#forgot" style={{ fontSize: '11px', fontWeight: 600, color: '#2563EB', textDecoration: 'none' }}>
+                          Forgot password?
+                        </a>
+                      </div>
+
+                      <Button 
+                        type="submit" 
+                        disabled={isLoading}
                         style={{
                           width: '100%',
-                          padding: '10px 38px 10px 38px',
-                          borderRadius: '6px',
-                          border: '1px solid #D1D5DB',
-                          backgroundColor: '#FFFFFF',
-                          color: '#0F172A',
-                          fontSize: '13px',
-                          outline: 'none'
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        style={{
-                          position: 'absolute',
-                          right: '12px',
-                          top: '12px',
-                          background: 'none',
+                          padding: '12px',
+                          backgroundColor: '#10B981',
                           border: 'none',
-                          color: '#94A3B8',
+                          color: 'white',
+                          fontWeight: 700,
+                          fontSize: '13px',
+                          borderRadius: '8px',
                           cursor: 'pointer',
-                          padding: 0
+                          boxShadow: '0 4px 6px -1px rgba(16,185,129,0.2)'
                         }}
                       >
-                        {showPassword ? <Icons.EyeOff size={16} /> : <Icons.Eye size={16} />}
-                      </button>
+                        {isLoading ? 'Accessing Center...' : `Access ${currentRole.label.split(' ')[0]}`}
+                      </Button>
+                    </form>
+
+                    {/* Demo autofill tip */}
+                    <div 
+                      onClick={handleAutofillDemo}
+                      style={{
+                        marginTop: '20px',
+                        padding: '8px 12px',
+                        backgroundColor: '#F8FAFC',
+                        border: '1px dashed #E2E8F0',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        color: '#64748B',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        fontWeight: 600
+                      }}
+                    >
+                      Demo Autofill: <span style={{ color: '#2563EB' }}>{currentRole.defaultUser} / password</span>
                     </div>
-                  </div>
 
-                  {/* Remember & forgot password link */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                      <input type="checkbox" style={{ cursor: 'pointer' }} />
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>Remember me</span>
-                    </label>
-                    <a href="#forgot" style={{ fontSize: '11px', fontWeight: 600, color: '#2563EB', textDecoration: 'none' }}>
-                      Forgot password?
-                    </a>
-                  </div>
-
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      backgroundColor: '#10B981',
-                      border: 'none',
-                      color: 'white',
-                      fontWeight: 700,
-                      fontSize: '13px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 6px -1px rgba(16,185,129,0.2)'
-                    }}
-                  >
-                    {isLoading ? 'Accessing Center...' : `Access ${currentRole.label.split(' ')[0]}`}
-                  </Button>
-                </form>
-
-                {/* Demo autofill tip */}
-                <div 
-                  onClick={handleAutofillDemo}
-                  style={{
-                    marginTop: '20px',
-                    padding: '8px 12px',
-                    backgroundColor: '#F8FAFC',
-                    border: '1px dashed #E2E8F0',
-                    borderRadius: '6px',
-                    fontSize: '11px',
-                    color: '#64748B',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    fontWeight: 600
-                  }}
-                >
-                  Demo Autofill: <span style={{ color: '#2563EB' }}>{currentRole.defaultUser} / password</span>
-                </div>
-
-                {/* Form Footer */}
-                <div style={{ textAlign: 'center', fontSize: '11px', color: '#64748B', marginTop: '20px' }}>
-                  Don't have an account? <span onClick={() => { window.location.href = "mailto:admin@medxnet.org?subject=MedXNet Account Support Request"; }} style={{ fontWeight: 600, color: '#2563EB', cursor: 'pointer' }}>Contact Admin</span>
-                </div>
+                    {/* Form Footer */}
+                    <div style={{ textAlign: 'center', fontSize: '11px', color: '#64748B', marginTop: '20px' }}>
+                      {selectedRoleKey === '/login/patient' ? (
+                        <>
+                          Don't have an account? <span onClick={() => setIsSignUp(true)} style={{ fontWeight: 600, color: '#2563EB', cursor: 'pointer' }}>Register here</span>
+                        </>
+                      ) : (
+                        <>
+                          Don't have an account? <span onClick={() => { window.location.href = "mailto:admin@medxnet.org?subject=MedXNet Account Support Request"; }} style={{ fontWeight: 600, color: '#2563EB', cursor: 'pointer' }}>Contact Admin</span>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
 
               </div>
             </div>

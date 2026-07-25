@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import PageHeader from '../../components/common/PageHeader';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
@@ -54,9 +54,44 @@ export const EmergencyRequest: React.FC = () => {
 
   // Emergency Chat state
   const [chatInput, setChatInput] = useState('');
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { sender: 'ai', text: 'State your clinical symptoms. I can guide you through immediate safety procedures while we evaluate your telemetry.' }
-  ]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+
+  const getPatientId = () => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.associatedId || 'PAT-001';
+      } catch (e) {}
+    }
+    return 'PAT-001';
+  };
+  
+  const patientId = getPatientId();
+
+  // Load initial messages from localStorage or default greeting
+  useEffect(() => {
+    const saved = localStorage.getItem(`medx_emergency_chat_messages_${patientId}`);
+    if (saved) {
+      try {
+        setChatMessages(JSON.parse(saved));
+        return;
+      } catch (e) {}
+    }
+    setChatMessages([
+      { sender: 'ai', text: 'State your clinical symptoms. I can guide you through immediate safety procedures while we evaluate your telemetry.' }
+    ]);
+  }, [patientId]);
+
+  // Persist messages to localStorage on change
+  useEffect(() => {
+    if (chatMessages.length > 0) {
+      if (chatMessages.length === 1 && chatMessages[0].text.startsWith('State your clinical symptoms')) {
+        return;
+      }
+      localStorage.setItem(`medx_emergency_chat_messages_${patientId}`, JSON.stringify(chatMessages));
+    }
+  }, [chatMessages, patientId]);
 
   // Handle SOS button click
   const triggerSOS = () => {
@@ -92,12 +127,42 @@ export const EmergencyRequest: React.FC = () => {
   };
 
   // Preset Symptoms trigger
-  const handlePresetSymptom = (symptom: string, aiAdvice: string) => {
+  const handlePresetSymptom = async (symptom: string) => {
     setChatMessages(prev => [
       ...prev,
-      { sender: 'user', text: symptom },
-      { sender: 'ai', text: aiAdvice }
+      { sender: 'user', text: symptom }
     ]);
+
+    const prompt = `You are a clinical guidance assistant. A patient is in a potential emergency situation.
+Provide immediate safety precautions, explanation of symptoms, and medical guidance based on their input.
+Be concise, clear, and reassuring. If it is life-threatening, tell them to remain calm and prepare for the arriving ambulance.
+
+User: ${symptom}
+AI:`;
+
+    try {
+      const res = await fetch('http://localhost:3001/api/system/chat-emergency', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await res.json();
+      if (data.success && data.text) {
+        setChatMessages(prev => [
+          ...prev,
+          { sender: 'ai', text: data.text }
+        ]);
+      } else {
+        throw new Error(data.message || 'Failed to fetch AI response');
+      }
+    } catch (err: any) {
+      console.error('Gemini failed:', err);
+      const errText = `Gemini API Error: ${err.message || 'Connection failed'}. Please verify that the "Generative Language API" is active for your project key in Google AI Studio.`;
+      setChatMessages(prev => [
+        ...prev,
+        { sender: 'ai', text: errText }
+      ]);
+    }
   };
 
   // Send Custom Message
@@ -107,12 +172,36 @@ export const EmergencyRequest: React.FC = () => {
     setChatMessages(prev => [...prev, { sender: 'user', text: userText }]);
     setChatInput('');
 
-    setTimeout(() => {
+    (async () => {
+      let responseText = '';
+      try {
+        const prompt = `You are a clinical guidance assistant. A patient is in a potential emergency situation.
+Provide immediate safety precautions, explanation of symptoms, and medical guidance based on their input.
+Be concise, clear, and reassuring. If it is life-threatening, tell them to remain calm and prepare for the arriving ambulance.
+
+User: ${userText}
+AI:`;
+        const res = await fetch('http://localhost:3001/api/system/chat-emergency', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+        const data = await res.json();
+        if (data.success && data.text) {
+          responseText = data.text;
+        } else {
+          throw new Error(data.message || 'Failed to fetch AI response');
+        }
+      } catch (err: any) {
+        console.error('Gemini failed:', err);
+        responseText = `Gemini API Error: ${err.message || 'Connection failed'}. Please verify that the "Generative Language API" is active for your project key in Google AI Studio.`;
+      }
+
       setChatMessages(prev => [
         ...prev,
-        { sender: 'ai', text: `Analyzing symptoms: "${userText}". Ensure your airway is clear, rest in a sitting position, and monitor your wearable pulse logs. We are mapping clinical units.` }
+        { sender: 'ai', text: responseText }
       ]);
-    }, 1500);
+    })();
   };
 
   // Severity Metadata
@@ -260,21 +349,21 @@ export const EmergencyRequest: React.FC = () => {
             {/* Quick Presets */}
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '12px', flexShrink: 0 }}>
               <button 
-                onClick={() => handlePresetSymptom('Heavy chest pain', 'Sit down immediately. Do not strain. If you have aspirin nearby, chew 325mg. Do not attempt to walk. Ambulance dispatch is highly advised.')}
+                onClick={() => handlePresetSymptom('Heavy chest pain')}
                 className="medx-badge medx-badge-danger"
                 style={{ cursor: 'pointer', border: '1px solid var(--color-danger-border)', background: 'none' }}
               >
                 Heavy chest pain
               </button>
               <button 
-                onClick={() => handlePresetSymptom('Severe burns', 'Run cool (not cold) water over the burn area for 10-20 minutes. Do not apply ice. Cover with clean plastic wrap or damp cloth. Await EMT.')}
+                onClick={() => handlePresetSymptom('Severe burns')}
                 className="medx-badge medx-badge-warning"
                 style={{ cursor: 'pointer', border: '1px solid var(--color-warning-border)', background: 'none' }}
               >
                 Severe burns
               </button>
               <button 
-                onClick={() => handlePresetSymptom('Severe asthma flareup', 'Use rescue inhaler (Albuterol) immediately (2-6 puffs). Sit upright, loosen clothing. If breathing remains labored, activate SOS.')}
+                onClick={() => handlePresetSymptom('Severe asthma flareup')}
                 className="medx-badge medx-badge-info"
                 style={{ cursor: 'pointer', border: '1px solid var(--color-primary-border)', background: 'none' }}
               >

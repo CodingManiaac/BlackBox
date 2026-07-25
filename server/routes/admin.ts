@@ -22,7 +22,47 @@ router.get('/audit-logs', (req: Request, res: Response, next: NextFunction) => {
 router.get('/metrics', (req: Request, res: Response, next: NextFunction) => {
   try {
     const metrics = MetricsCollector.getMetrics();
-    res.json({ success: true, metrics });
+    
+    // Compute dynamic SQLite metrics
+    const totalUsers = db.prepare('SELECT COUNT(*) as cnt FROM users').get().cnt;
+    const totalOrders = db.prepare('SELECT COUNT(*) as cnt FROM orders').get().cnt;
+    const activePharmacies = db.prepare("SELECT COUNT(*) as cnt FROM facilities WHERE type = 'Pharmacy'").get().cnt;
+    const activeBloodBanks = db.prepare("SELECT COUNT(*) as cnt FROM facilities WHERE type = 'Blood Bank'").get().cnt;
+    const activeHospitals = db.prepare("SELECT COUNT(*) as cnt FROM facilities WHERE type = 'Hospital'").get().cnt;
+    
+    // Emergency requests (eceLevel <= 2) and completion rate
+    const contexts = db.prepare('SELECT context_json FROM requests_context').all();
+    let emergencyRequests = 0;
+    let completedWorkflows = 0;
+    
+    for (const row of contexts) {
+      try {
+        const ctx = JSON.parse(row.context_json);
+        const ece = ctx.agentOutputs?.find((o: any) => o.agentId === 'ece')?.output;
+        if (ece && ece.eceLevel <= 2) {
+          emergencyRequests++;
+        }
+        if (ctx.status === 'COMPLETED' || ctx.status === 'Delivered') {
+          completedWorkflows++;
+        }
+      } catch (e) {}
+    }
+    
+    const workflowCompletionRate = contexts.length > 0 ? `${Math.round((completedWorkflows / contexts.length) * 100)}%` : '100%';
+
+    res.json({ 
+      success: true, 
+      metrics: {
+        ...metrics,
+        totalUsers,
+        totalOrders,
+        activePharmacies,
+        activeBloodBanks,
+        activeHospitals,
+        emergencyRequests,
+        workflowCompletionRate
+      } 
+    });
   } catch (err) {
     next(err);
   }

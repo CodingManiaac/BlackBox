@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import PageHeader from '../../components/common/PageHeader';
 import KPICard from '../../components/widgets/KPICard';
 import Card from '../../components/common/Card';
@@ -6,6 +6,7 @@ import Table, { Column } from '../../components/common/Table';
 import Button from '../../components/common/Button';
 import { useNavigation } from '../../hooks/useNavigation';
 import { ArrowRight, ShieldAlert } from 'lucide-react';
+import ActivityFeed, { ActivityItem } from '../../components/widgets/ActivityFeed';
 
 interface PendingVerification {
   id: string;
@@ -18,11 +19,118 @@ interface PendingVerification {
 export const Dashboard: React.FC = () => {
   const { navigateTo } = useNavigation();
 
+  const [ordersCount, setOrdersCount] = useState(42);
+  const [revenue, setRevenue] = useState(1840);
+  const [lowStockCount, setLowStockCount] = useState(3);
+  const [pendingVerificationsCount, setPendingVerificationsCount] = useState(4);
+  const [pendingList, setPendingList] = useState<PendingVerification[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  const getPharmacyName = () => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.name || 'Care Pharmacy';
+      } catch (e) {}
+    }
+    return 'Care Pharmacy';
+  };
+  const pharmacyName = getPharmacyName();
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/workflow/notifications/role?role=pharmacy&recipientId=${encodeURIComponent(pharmacyName)}`);
+      const data = await res.json();
+      if (data.success) {
+        setNotifications(data.notifications);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleNotificationClick = async (id: string) => {
+    try {
+      await fetch(`http://localhost:3001/api/workflow/notifications/${id}/read`, { method: 'POST' });
+      fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleNotificationClearAll = async () => {
+    try {
+      await fetch('http://localhost:3001/api/workflow/notifications/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'pharmacy', recipientId: pharmacyName })
+      });
+      fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchDashboardData = async () => {
+    try {
+      // 1. Fetch Orders to compute Orders Count and Revenue
+      const ordersRes = await fetch('http://localhost:3001/api/orders');
+      const ordersData = await ordersRes.json();
+      if (ordersData.success) {
+        const pharmacyOrders = ordersData.orders.filter((o: any) => o.assigned_pharmacy === pharmacyName);
+        setOrdersCount(pharmacyOrders.length);
+        const totalRev = pharmacyOrders.reduce((acc: number, o: any) => acc + (o.total_amount || 0), 0);
+        setRevenue(totalRev);
+      }
+
+      // 2. Fetch Inventory to compute Low Stock items
+      const invRes = await fetch('http://localhost:3001/api/pharmacies/inventory');
+      const invData = await invRes.json();
+      if (invData.success) {
+        const lowStock = invData.inventory.filter((item: any) => item.quantity < 20);
+        setLowStockCount(lowStock.length);
+      }
+
+      // 3. Fetch Prescription Verifications
+      const verRes = await fetch('http://localhost:3001/api/pharmacies/verifications');
+      const verData = await verRes.json();
+      if (verData.success) {
+        const awaiting = verData.queue.filter((v: any) => v.status === 'Awaiting Audit');
+        setPendingVerificationsCount(awaiting.length);
+        
+        const mappedList: PendingVerification[] = awaiting.map((v: any) => ({
+          id: v.id,
+          patient: v.patient_name,
+          doctor: v.doctor_name,
+          medication: v.prescribed_drug,
+          timeAwaiting: v.date
+        }));
+        setPendingList(mappedList);
+      }
+    } catch (err) {
+      console.error('Failed to load pharmacy dashboard stats:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+    fetchNotifications();
+
+    const eventSource = new EventSource('http://localhost:3001/api/workflow/stream');
+    eventSource.onmessage = () => {
+      fetchDashboardData();
+      fetchNotifications();
+    };
+
+    return () => eventSource.close();
+  }, []);
+
   const kpis = [
-    { title: 'Orders Today', value: '42', badgeText: 'Syncing', badgeVariant: 'info' as const, desc: '14 orders preparing' },
-    { title: 'Revenue (Today)', value: '$1,840', badgeText: '+8.4%', badgeVariant: 'success' as const, desc: 'Average transaction: $43.80' },
-    { title: 'Low Stock Alert', value: '3 Items', badgeText: 'Action Needed', badgeVariant: 'danger' as const, desc: 'Atorvastatin 20mg, Insulin...' },
-    { title: 'Pending Verification', value: '4 Prescriptions', badgeText: 'Audit Needed', badgeVariant: 'warning' as const, desc: 'Average verification: 6m' }
+    { title: 'Orders Today', value: String(ordersCount), badgeText: 'Syncing', badgeVariant: 'info' as const, desc: 'Assigned to facility' },
+    { title: 'Revenue (Today)', value: `$${revenue.toLocaleString()}`, badgeText: 'Live', badgeVariant: 'success' as const, desc: 'Calculated from total sales' },
+    { title: 'Low Stock Alert', value: `${lowStockCount} Items`, badgeText: lowStockCount > 0 ? 'Action Needed' : 'Healthy', badgeVariant: lowStockCount > 0 ? 'danger' as const : 'success' as const, desc: 'Stock quantity < 20' },
+    { title: 'Pending Verification', value: `${pendingVerificationsCount} Prescriptions`, badgeText: pendingVerificationsCount > 0 ? 'Audit Needed' : 'Clear', badgeVariant: pendingVerificationsCount > 0 ? 'warning' as const : 'success' as const, desc: 'Awaiting pharmacist signoff' }
   ];
 
   // Visual CSS-based sales trend graph data
@@ -34,12 +142,6 @@ export const Dashboard: React.FC = () => {
     { hour: '16:00', sales: 18 },
     { hour: '18:00', sales: 40 },
     { hour: '20:00', sales: 15 }
-  ];
-
-  const pendingList: PendingVerification[] = [
-    { id: 'RXV-9920', patient: 'A. Sterling', doctor: 'Dr. S. Jenkins', medication: 'Atorvastatin 20mg (30 tabs)', timeAwaiting: '3 mins ago' },
-    { id: 'RXV-1102', patient: 'G. Henderson', doctor: 'Dr. R. Gupta', medication: 'Metformin 500mg (60 tabs)', timeAwaiting: '8 mins ago' },
-    { id: 'RXV-4399', patient: 'M. Vance', doctor: 'Dr. S. Jenkins', medication: 'Lisinopril 10mg (30 tabs)', timeAwaiting: '14 mins ago' }
   ];
 
   const pendingCols: Column<PendingVerification>[] = [
@@ -161,6 +263,21 @@ export const Dashboard: React.FC = () => {
               </Button>
             </div>
           </Card>
+
+          {/* Stakeholder Alerts Feed */}
+          <ActivityFeed 
+            title="Pharmacy Alerts & Notifications" 
+            activities={notifications.map((n: any) => ({
+              id: n.id,
+              title: n.read === 1 ? 'Read Alert' : 'Unread Alert',
+              time: new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              description: n.message,
+              badgeText: n.read === 1 ? 'Read' : 'New',
+              badgeVariant: n.read === 1 ? ('success' as const) : ('warning' as const)
+            }))}
+            onItemClick={handleNotificationClick}
+            onClearAll={handleNotificationClearAll}
+          />
 
         </div>
 

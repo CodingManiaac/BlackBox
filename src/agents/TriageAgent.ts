@@ -13,9 +13,7 @@ export class TriageAgent extends BaseAgent {
     const extractedMedicines = aiResponse.medicines;
     const extractedSymptoms = aiResponse.symptoms;
     const detectedBlood = aiResponse.bloodGroup || null;
-    const urgencyKeywords = (aiResponse.urgency === 'Immediate Life Threat' || aiResponse.urgency === 'Urgent') 
-      ? [aiResponse.urgency] 
-      : [];
+    const urgencyKeywords = aiResponse.urgencyKeywords || [];
 
     const triageOutput = {
       intent: queryLower.includes('need') || queryLower.includes('request') ? 'Supply Request' : 'Symptom Evaluation',
@@ -24,7 +22,7 @@ export class TriageAgent extends BaseAgent {
       urgencyKeywords: urgencyKeywords,
       detectedBloodGroup: detectedBlood,
       confidence: Math.round(aiResponse.confidence * 100),
-      reason: `Parsed clinical tokens (${aiResponse.parserMode} Mode): Symptoms: [${extractedSymptoms.join(', ')}], Meds: [${extractedMedicines.join(', ')}].`
+      reason: aiResponse.reasoning || `Parsed clinical tokens (${aiResponse.parserMode} Mode): Symptoms: [${extractedSymptoms.join(', ')}], Meds: [${extractedMedicines.join(', ')}].`
     };
 
     const nextContext: RequestContext = {

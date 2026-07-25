@@ -7,6 +7,7 @@ import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { useToast } from '../../hooks/useToast';
 import { FileText } from 'lucide-react';
+import KPICard from '../../components/widgets/KPICard';
 
 interface PatientOrder {
   id: string;
@@ -21,12 +22,29 @@ interface PatientOrder {
   discount?: number;
   deliveryFee?: number;
   tax?: number;
+  eceLevel?: number;
 }
 
 export const Orders: React.FC = () => {
   const toastManager = useToast();
 
+  const getPatientName = () => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.name || parsed.username || 'Patient';
+      } catch (e) {}
+    }
+    return 'Patient';
+  };
+  const patientName = getPatientName();
+
   const [orders, setOrders] = useState<PatientOrder[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [cancelledCount, setCancelledCount] = useState(0);
+  const [spending, setSpending] = useState(0.00);
 
   const [selectedInvoice, setSelectedInvoice] = useState<PatientOrder | null>(null);
   const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
@@ -55,10 +73,20 @@ export const Orders: React.FC = () => {
   useEffect(() => {
     const fetchRealOrders = async () => {
       try {
+        const session = localStorage.getItem('medx_session');
+        let patientId = 'PAT-001';
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            patientId = parsed.associatedId || 'PAT-001';
+          } catch (e) {}
+        }
+
         const res = await fetch('http://localhost:3001/api/orders');
         const data = await res.json();
         if (data.success) {
-          const mapped: PatientOrder[] = data.orders.map((o: any) => ({
+          const userOrders = data.orders.filter((o: any) => o.patient_id === patientId);
+          const mapped: PatientOrder[] = userOrders.map((o: any) => ({
             id: o.id,
             medication: (o.medicine || '').includes('(x') ? o.medicine : `${o.medicine || ''} (Qty: ${o.quantity})`,
             date: new Date(o.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
@@ -70,10 +98,15 @@ export const Orders: React.FC = () => {
             paymentMethod: o.payment_method || undefined,
             discount: o.discount || 0,
             deliveryFee: o.delivery_fee || 0,
-            tax: o.tax || 0
+            tax: o.tax || 0,
+            eceLevel: o.ece_level
           }));
           
           setOrders(mapped);
+          setTotalCount(mapped.length);
+          setCompletedCount(mapped.filter(o => o.status === 'Delivered').length);
+          setCancelledCount(mapped.filter(o => o.status === 'Cancelled').length);
+          setSpending(mapped.reduce((sum, o) => sum + o.cost, 0));
         }
       } catch (err) {
         console.error('Failed to load patient orders:', err);
@@ -134,13 +167,16 @@ export const Orders: React.FC = () => {
   const getStatusBadge = (status: PatientOrder['status']) => {
     switch(status) {
       case 'Delivered':
+      case 'Refund Approved':
         return <Badge variant="success">{status}</Badge>;
       case 'Placed':
       case 'Verified':
       case 'Refund Pending':
+      case 'Waiting for Pharmacy Response':
         return <Badge variant="warning">{status}</Badge>;
       case 'Cancelled':
       case 'Refunded':
+      case 'Refund Rejected':
         return <Badge variant="danger">{status}</Badge>;
       default:
         return <Badge variant="info">{status}</Badge>;
@@ -211,6 +247,14 @@ export const Orders: React.FC = () => {
         description="Fulfill order cancellations, process drug refunds, re-order prescriptions, and check shipping invoices."
       />
 
+      {/* 0. Patient Analytics KPI Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '24px' }}>
+        <KPICard title="Total Orders" value={`${totalCount} Orders`} badgeText="Syncing" badgeVariant="info" description="Intakes registered" />
+        <KPICard title="Completed Orders" value={`${completedCount} Orders`} badgeText="Delivered" badgeVariant="success" description="Completed dispatches" />
+        <KPICard title="Cancelled Orders" value={`${cancelledCount} Orders`} badgeText="Cancelled" badgeVariant="danger" description="Failed dispatches" />
+        <KPICard title="Total Spending" value={`$${spending.toFixed(2)}`} badgeText="Live" badgeVariant="success" description="Overall billing spending" />
+      </div>
+
       {/* 1. Active deliveries timeline tracking */}
       {activeOrders.length > 0 && (
         <div>
@@ -223,7 +267,17 @@ export const Orders: React.FC = () => {
                     <h4 className="medx-card-title" style={{ fontSize: '15px' }}>
                       {order.medication}
                     </h4>
-                    <span className="medx-caption">Order ID: <strong>{order.id}</strong> • Value: ${order.cost.toFixed(2)}</span>
+                    <span className="medx-caption">
+                      Order ID: <strong>{order.id}</strong> • Value: ${order.cost.toFixed(2)}
+                      {order.eceLevel !== undefined && (
+                        <span> • Priority: <strong>ECE-{order.eceLevel} ({
+                          order.eceLevel === 1 ? 'Life Threatening' :
+                          order.eceLevel === 2 ? 'Critical' :
+                          order.eceLevel === 3 ? 'Priority' :
+                          order.eceLevel === 4 ? 'Moderate' : 'Routine'
+                        })</strong></span>
+                      )}
+                    </span>
                   </div>
                   {getStatusBadge(order.status)}
                 </div>
@@ -325,7 +379,7 @@ export const Orders: React.FC = () => {
 
             <div>
               <span className="medx-caption">Billed To:</span>
-              <div style={{ fontSize: '14px', fontWeight: 600 }}>Vishu Kumar (Patient Profile)</div>
+              <div style={{ fontSize: '14px', fontWeight: 600 }}>{patientName} (Patient Profile)</div>
               <div className="medx-caption" style={{ fontSize: '11px' }}>Date: {selectedInvoice.date}</div>
               {selectedInvoice.addressLine && (
                 <div className="medx-caption" style={{ fontSize: '11px', marginTop: '4px' }}>

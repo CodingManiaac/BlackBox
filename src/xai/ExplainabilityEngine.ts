@@ -5,9 +5,11 @@ import { ConfidenceAnalyzer } from './ConfidenceAnalyzer';
 import { RecommendationBuilder } from './RecommendationBuilder';
 import { RiskAnalyzer } from './RiskAnalyzer';
 import { HumanReviewEngine } from './HumanReviewEngine';
+import { apiKeys } from '../config/apiKeys';
+import { GeminiProvider } from '../integrations/GeminiProvider';
 
 export class ExplainabilityEngine {
-  static generateReport(context: RequestContext): RequestContext {
+  static async generateReport(context: RequestContext): Promise<RequestContext> {
     const triageOutput = context.agentOutputs.find(out => out.agentId === 'triage')?.output;
     const eceOutput = context.agentOutputs.find(out => out.agentId === 'ece')?.output;
     const gisOutput = context.agentOutputs.find(out => out.agentId === 'gis')?.output;
@@ -19,8 +21,27 @@ export class ExplainabilityEngine {
     const risk = RiskAnalyzer.analyze(context);
     const review = HumanReviewEngine.evaluate(context);
     
-    const techRec = RecommendationBuilder.buildTechnical(context);
-    const patientFriendly = RecommendationBuilder.buildPatientFriendly(context);
+    let techRec = RecommendationBuilder.buildTechnical(context);
+    let patientFriendly = RecommendationBuilder.buildPatientFriendly(context);
+
+    const mode = context.metadata?.mode || 'Mock';
+    if (mode === 'Production' && apiKeys.gemini) {
+      try {
+        const promptTech = `Generate a technical clinical explainability report for the following context:
+${JSON.stringify(context.agentOutputs, null, 2)}
+Provide a brief, professional summary of the decision path, severity level, facility coordinates routing, and courier dispatch. Keep it under 3-4 sentences.`;
+
+        const promptPatient = `Generate a warm, reassuring, and patient-friendly explanation of the clinical triage decision for the patient.
+Use simple, non-jargon language. Do not show raw JSON. Here is the context:
+${JSON.stringify(context.agentOutputs, null, 2)}
+Keep it under 3 sentences.`;
+
+        techRec = await GeminiProvider.generateContent(promptTech, 'text');
+        patientFriendly = await GeminiProvider.generateContent(promptPatient, 'text');
+      } catch (err) {
+        console.warn('Gemini explainability generation failed, falling back to templates.', err);
+      }
+    }
 
     const report: ExplainabilityReport = {
       requestText: context.query,

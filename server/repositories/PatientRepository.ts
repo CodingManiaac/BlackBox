@@ -18,6 +18,7 @@ export interface PatientRecord {
   email_notify?: number;
   language?: string;
   consent_active?: number;
+  profile_photo?: string;
 }
 
 export class PatientRepository {
@@ -27,8 +28,8 @@ export class PatientRepository {
 
   static create(patient: PatientRecord) {
     db.prepare(`
-      INSERT INTO patients (id, name, age, gender, phone, blood_group, allergies, medical_history, emergency_contacts, email, address_line, city, zip_code, sms_notify, email_notify, language, consent_active)
-      VALUES (@id, @name, @age, @gender, @phone, @blood_group, @allergies, @medical_history, @emergency_contacts, @email, @address_line, @city, @zip_code, @sms_notify, @email_notify, @language, @consent_active)
+      INSERT INTO patients (id, name, age, gender, phone, blood_group, allergies, medical_history, emergency_contacts, email, address_line, city, zip_code, sms_notify, email_notify, language, consent_active, profile_photo)
+      VALUES (@id, @name, @age, @gender, @phone, @blood_group, @allergies, @medical_history, @emergency_contacts, @email, @address_line, @city, @zip_code, @sms_notify, @email_notify, @language, @consent_active, @profile_photo)
     `).run({
       id: patient.id,
       name: patient.name,
@@ -46,7 +47,8 @@ export class PatientRepository {
       sms_notify: patient.sms_notify ?? 1,
       email_notify: patient.email_notify ?? 0,
       language: patient.language || 'en',
-      consent_active: patient.consent_active ?? 1
+      consent_active: patient.consent_active ?? 1,
+      profile_photo: patient.profile_photo || null
     });
   }
 
@@ -55,7 +57,7 @@ export class PatientRepository {
       UPDATE patients
       SET name = ?, email = ?, address_line = ?, city = ?, zip_code = ?,
           emergency_contacts = ?, sms_notify = ?, email_notify = ?,
-          language = ?, consent_active = ?, allergies = ?
+          language = ?, consent_active = ?, allergies = ?, profile_photo = ?
       WHERE id = ?
     `).run(
       settings.name ?? '',
@@ -69,6 +71,7 @@ export class PatientRepository {
       settings.language ?? 'en',
       settings.consent_active ?? 1,
       settings.allergies ?? '',
+      settings.profile_photo ?? '',
       id
     );
   }

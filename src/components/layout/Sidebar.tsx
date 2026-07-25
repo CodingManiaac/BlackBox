@@ -14,6 +14,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, collapsed = false, onClo
   const { currentPath, navigateTo } = useNavigation();
   const navItems = NAVIGATION_CONFIG[role] || [];
 
+  const [userName, setUserName] = React.useState(() => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.name || parsed.username || 'User';
+      } catch (e) {}
+    }
+    return 'User';
+  });
+
+  React.useEffect(() => {
+    const handleUpdate = (e: any) => {
+      if (e.detail && e.detail.name) {
+        setUserName(e.detail.name);
+      } else {
+        const session = localStorage.getItem('medx_session');
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            setUserName(parsed.name || parsed.username || 'User');
+          } catch (err) {}
+        }
+      }
+    };
+    window.addEventListener('patient-profile-updated', handleUpdate);
+    return () => window.removeEventListener('patient-profile-updated', handleUpdate);
+  }, []);
+
   const handleNavClick = (path: string) => {
     navigateTo(path);
     if (onCloseMobile) onCloseMobile();
@@ -153,41 +182,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, collapsed = false, onClo
           );
         })}
       </nav>
-
-      {/* Mini Profile / Quick Info */}
-      <div style={{
-        padding: '16px 20px',
-        borderTop: '1px solid var(--color-border)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        overflow: 'hidden',
-        flexShrink: 0
-      }}>
-        <div style={{
-          width: '30px',
-          height: '30px',
-          borderRadius: '50%',
-          backgroundColor: '#F1F5F9',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--color-text-secondary)',
-          flexShrink: 0
-        }}>
-          <Icons.User size={14} />
-        </div>
-        {!collapsed && (
-          <div style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-              Vishu Kumar
-            </div>
-            <div className="medx-caption" style={{ fontSize: '10px', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-              {role}
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 };

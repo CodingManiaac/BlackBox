@@ -113,7 +113,7 @@ export class MedXEngine {
     let finalContext = await WorkflowEngine.executeWorkflow(initialContext, workflowConfig.pipeline);
 
     if (finalContext.status === 'COMPLETED') {
-      finalContext = ExplainabilityEngine.generateReport(finalContext);
+      finalContext = await ExplainabilityEngine.generateReport(finalContext);
     }
 
     // Update in-memory state

@@ -69,12 +69,28 @@ export class WorkflowOrchestrator {
     });
   }
 
-  static acceptRequest(requestId: string, facilityId: string, remarks?: string) {
+  static acceptRequest(requestId: string, facilityId: string, remarks?: string): boolean {
     const facility = db.prepare('SELECT name FROM facilities WHERE id = ?').get(facilityId) as { name: string } | undefined;
-    const facilityName = facility ? facility.name : 'Care Pharmacy Store';
+    const facilityName = facility ? facility.name : 'Care Pharmacy';
 
-    db.prepare("UPDATE orders SET status = 'Under Review', assigned_pharmacy = ? WHERE id = ?").run(facilityName, requestId);
-    this.updateStage(requestId, 'PHARMACY_REVIEW', { facilityName, remarks });
+    let success = false;
+    db.transaction(() => {
+      const order = db.prepare("SELECT assigned_pharmacy, status FROM orders WHERE id = ?").get(requestId) as { assigned_pharmacy: string; status: string } | undefined;
+      if (order && order.status === 'Pending') {
+        const isUnassigned = order.assigned_pharmacy === 'Unassigned' || 
+                             order.assigned_pharmacy === 'Default Pharmacy' ||
+                             !order.assigned_pharmacy;
+        if (isUnassigned || order.assigned_pharmacy === facilityName) {
+          db.prepare("UPDATE orders SET status = 'Under Review', assigned_pharmacy = ? WHERE id = ?").run(facilityName, requestId);
+          success = true;
+        }
+      }
+    })();
+
+    if (success) {
+      this.updateStage(requestId, 'PHARMACY_REVIEW', { facilityName, remarks });
+    }
+    return success;
   }
 
   static verifyPrescription(requestId: string) {
@@ -83,11 +99,32 @@ export class WorkflowOrchestrator {
   }
 
   static reserveInventory(requestId: string) {
-    // Deduct stock for medicines in order_items
+    // 1. Deduct stock for medicines in order_items
     const items = db.prepare('SELECT medicine_name, quantity FROM order_items WHERE order_id = ?').all(requestId) as { medicine_name: string; quantity: number }[];
     for (const item of items) {
       db.prepare('UPDATE medicines SET stock = MAX(0, stock - ?) WHERE name = ?').run(item.quantity, item.medicine_name);
       db.prepare('UPDATE inventory SET quantity = MAX(0, quantity - ?) WHERE medicine = ?').run(item.quantity, item.medicine_name);
+    }
+    
+    // 2. Direct/fallback deduction for orders with no order_items (e.g. hospital requests)
+    if (items.length === 0) {
+      const order = db.prepare('SELECT medicine, quantity FROM orders WHERE id = ?').get(requestId) as { medicine: string; quantity: number } | undefined;
+      if (order && order.medicine && order.quantity) {
+        db.prepare('UPDATE inventory SET quantity = MAX(0, quantity - ?) WHERE medicine = ?').run(order.quantity, order.medicine);
+      }
+    }
+
+    // 3. Deduct blood group quantity if it is a blood/combined request
+    try {
+      const order = db.prepare('SELECT request_type, blood_group, blood_units, facility_id FROM orders WHERE id = ?').get(requestId) as any;
+      if (order) {
+        if ((order.request_type === 'Blood' || order.request_type === 'Combined') && order.blood_group && order.blood_units) {
+          db.prepare('UPDATE blood_banks SET quantity = MAX(0, quantity - ?) WHERE facility_id = ? AND blood_group = ?')
+            .run(order.blood_units, order.facility_id || 'FAC-005', order.blood_group);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to deduct blood inventory on reservation:', e);
     }
     
     db.prepare("UPDATE orders SET status = 'Preparing' WHERE id = ?").run(requestId);

@@ -13,13 +13,32 @@ export const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
 
   // Profile State
-  const [profileName, setProfileName] = useState('Vishu Kumar');
-  const [profileEmail, setProfileEmail] = useState('vishu.kumar@medxnet.hq');
+  const [profileName, setProfileName] = useState(() => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.name || parsed.username || '';
+      } catch (e) {}
+    }
+    return '';
+  });
+  const [profileEmail, setProfileEmail] = useState(() => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.email || '';
+      } catch (e) {}
+    }
+    return '';
+  });
   const [addressLine, setAddressLine] = useState('');
   const [city, setCity] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [emergencyContacts, setEmergencyContacts] = useState('');
   const [language, setLanguage] = useState('en');
+  const [profilePhoto, setProfilePhoto] = useState('');
 
   // Allergies state list
   const [allergies, setAllergies] = useState<string[]>(['Penicillin', 'Sulfa Drugs', 'Aspirin']);
@@ -62,6 +81,7 @@ export const Settings: React.FC = () => {
           setEmailNotify(p.email_notify === 1);
           setLanguage(p.language || 'en');
           setConsentActive(p.consent_active === 1);
+          setProfilePhoto(p.profile_photo || '');
           if (p.allergies) {
             setAllergies(p.allergies.split(',').map((s: string) => s.trim()).filter(Boolean));
           }
@@ -111,11 +131,31 @@ export const Settings: React.FC = () => {
           emailNotify: emailNotify ? 1 : 0,
           language,
           consentActive: consentActive ? 1 : 0,
-          allergies: allergies.join(', ')
+          allergies: allergies.join(', '),
+          profilePhoto
         })
       });
       const data = await res.json();
       if (data.success) {
+        // Update local session
+        const session = localStorage.getItem('medx_session');
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            parsed.name = profileName;
+            localStorage.setItem('medx_session', JSON.stringify(parsed));
+          } catch (e) {}
+        }
+        
+        // Dispatch custom sync event
+        window.dispatchEvent(new CustomEvent('patient-profile-updated', {
+          detail: {
+            name: profileName,
+            profile_photo: profilePhoto,
+            address_line: addressLine
+          }
+        }));
+
         toastManager.addToast('Settings profile changes saved successfully to SQLite.', 'success');
       } else {
         toastManager.addToast(data.message || 'Failed to save settings.', 'danger');
@@ -153,6 +193,11 @@ export const Settings: React.FC = () => {
                 label="Registered Email Address" 
                 value={profileEmail} 
                 onChange={(e) => setProfileEmail(e.target.value)} 
+              />
+              <Input 
+                label="Profile Photo URL" 
+                value={profilePhoto} 
+                onChange={(e) => setProfilePhoto(e.target.value)} 
               />
               <Input 
                 label="Address Line" 

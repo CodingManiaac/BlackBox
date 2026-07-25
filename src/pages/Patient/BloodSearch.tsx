@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PageHeader from '../../components/common/PageHeader';
 import Card from '../../components/common/Card';
 import Table, { Column } from '../../components/common/Table';
@@ -6,7 +6,7 @@ import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { useToast } from '../../hooks/useToast';
-import { Droplet, AlertCircle, Share2, Award, Clock } from 'lucide-react';
+import { Droplet, Award, Clock } from 'lucide-react';
 
 interface BloodBankStock {
   id: string;
@@ -27,15 +27,44 @@ export const BloodSearch: React.FC = () => {
   const toastManager = useToast();
 
   const [selectedGroup, setSelectedGroup] = useState<string>('O-');
-  const [broadcastActive, setBroadcastActive] = useState(false);
   const [reservedBank, setReservedBank] = useState<BloodBankStock | null>(null);
+  const [bloodBankData, setBloodBankData] = useState<BloodBankStock[]>([]);
 
-  // Simulated blood bank stock data based on O- or general selection
-  const bloodBankData: BloodBankStock[] = [
-    { id: 'BB-01', bankName: 'Central Red Cross Blood Bank', distance: '1.4 km away', stockLevel: selectedGroup === 'O-' ? 'Critical' : 'Adequate', unitsAvailable: selectedGroup === 'O-' ? 2 : 45 },
-    { id: 'BB-02', bankName: 'Metro General Hospital Blood Depot', distance: '2.5 km away', stockLevel: selectedGroup === 'O-' ? 'Critical' : 'Adequate', unitsAvailable: selectedGroup === 'O-' ? 1 : 28 },
-    { id: 'BB-03', bankName: 'City Blood Registry Center', distance: '4.8 km away', stockLevel: selectedGroup === 'O-' ? 'Out of Stock' : 'Adequate', unitsAvailable: selectedGroup === 'O-' ? 0 : 84 }
-  ];
+  const fetchInventory = async () => {
+    try {
+      const res = await fetch('http://localhost:3001/api/hospitals/blood');
+      const data = await res.json();
+      if (data.success) {
+        // Filter by the selected blood group
+        const matched = data.blood.filter((b: any) => b.blood_group === selectedGroup);
+        const mapped: BloodBankStock[] = matched.map((b: any) => {
+          let dist = '5.2 km away';
+          if (b.facility_id === 'FAC-005') dist = '1.4 km away';
+          else if (b.facility_id === 'FAC-B02') dist = '2.5 km away';
+          else if (b.facility_id === 'FAC-B03') dist = '4.8 km away';
+          
+          let level: 'Adequate' | 'Critical' | 'Out of Stock' = 'Adequate';
+          if (b.quantity === 0) level = 'Out of Stock';
+          else if (b.quantity < 5) level = 'Critical';
+
+          return {
+            id: b.facility_id,
+            bankName: b.facility_name || 'Blood Bank Depot',
+            distance: dist,
+            stockLevel: level,
+            unitsAvailable: b.quantity
+          };
+        });
+        setBloodBankData(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to fetch blood bank inventory:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchInventory();
+  }, [selectedGroup]);
 
   const matchedDonors: MatchedDonor[] = [
     { name: 'David Miller', bloodType: selectedGroup, distance: '0.8 km', status: 'Ready to Donate' },
@@ -43,11 +72,7 @@ export const BloodSearch: React.FC = () => {
     { name: 'Alex Henderson', bloodType: selectedGroup, distance: '2.2 km', status: 'Donated Recently' }
   ];
 
-  // Trigger emergency broadcast
-  const triggerBroadcast = () => {
-    setBroadcastActive(true);
-    toastManager.addToast(`EMERGENCY BROADCAST SENT: Matching donors for blood type ${selectedGroup} have been alerted in a 5km radius.`, 'error', 6000);
-  };
+
 
   const handleReservation = (bank: BloodBankStock) => {
     if (bank.unitsAvailable === 0) {
@@ -80,6 +105,7 @@ export const BloodSearch: React.FC = () => {
       if (res.ok) {
         toastManager.addToast(`1 unit of ${selectedGroup} successfully reserved at ${reservedBank.bankName}. Order ID: ${data.orderId}`, 'success');
         setReservedBank(null);
+        fetchInventory();
       } else {
         toastManager.addToast(data.message || 'Failed to reserve blood pack.', 'danger');
       }
@@ -153,29 +179,7 @@ export const BloodSearch: React.FC = () => {
           </p>
         </Card>
 
-        {/* Emergency Broadcast Card */}
-        <Card shadow="sm" hoverLift={false} style={{ borderLeft: '4px solid var(--color-danger)', backgroundColor: '#FEF2F2' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-danger)' }}>
-              <AlertCircle size={20} />
-              <h4 className="medx-card-title" style={{ margin: 0, color: 'var(--color-danger)' }}>Immediate Critical Necessity?</h4>
-            </div>
-            <p className="medx-caption" style={{ color: '#991B1B', margin: 0, lineHeight: 1.4 }}>
-              If a patient requires immediate blood units and banks are low, trigger an emergency broadcast. This alerts all verified donors of blood group <strong>{selectedGroup}</strong> in the region.
-            </p>
-            <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
-              <Button variant="danger" onClick={triggerBroadcast}>
-                <Share2 size={14} />
-                Issue Emergency Broadcast
-              </Button>
-              {broadcastActive && (
-                <div style={{ animation: 'pulse 1.5s infinite alternate', display: 'flex', alignItems: 'center' }}>
-                  <Badge variant="danger">Broadcast Live</Badge>
-                </div>
-              )}
-            </div>
-          </div>
-        </Card>
+
       </div>
 
       {/* 2. Main Splits */}

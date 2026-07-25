@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PageHeader from '../../components/common/PageHeader';
 import Table, { Column } from '../../components/common/Table';
 import Badge from '../../components/common/Badge';
@@ -22,13 +22,7 @@ interface StockItem {
 export const Inventory: React.FC = () => {
   const toastManager = useToast();
 
-  const [stock, setStock] = useState<StockItem[]>([
-    { id: 'INV-01', name: 'Atorvastatin 20mg', generic: 'Lipitor', units: 12, batchCode: 'B-AT992', expiry: '2028-04-12', supplier: 'Aalee Pharma Distributors', status: 'Low Stock' },
-    { id: 'INV-02', name: 'Metformin 500mg', generic: 'Glucophage', units: 145, batchCode: 'B-MET20', expiry: '2027-10-30', supplier: 'Global Drug Sync Corp', status: 'Adequate' },
-    { id: 'INV-03', name: 'Lisinopril 10mg', generic: 'Zestril', units: 98, batchCode: 'B-LIS88', expiry: '2029-01-15', supplier: 'Apex Clinical Supplies', status: 'Adequate' },
-    { id: 'INV-04', name: 'Insulin Glargine 100 U', generic: 'Lantus', units: 0, batchCode: 'B-INS02', expiry: '2026-09-08', supplier: 'MedX Prime Logistics', status: 'Out of Stock' }
-  ]);
-
+  const [stock, setStock] = useState<StockItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [purchaseOrderOpen, setPurchaseOrderOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -39,42 +33,107 @@ export const Inventory: React.FC = () => {
   const [poQty, setPoQty] = useState(50);
   const [poSupplier, setPoSupplier] = useState('Aalee Pharma Distributors');
 
+  const fetchInventory = async () => {
+    try {
+      const res = await fetch('http://localhost:3001/api/pharmacies/inventory');
+      const data = await res.json();
+      if (data.success) {
+        // Map database inventory to StockItem
+        const mapped: StockItem[] = data.inventory.map((item: any, idx: number) => {
+          let generic = item.alternatives || 'Generic Medication';
+          let supplier = 'Global Drug Sync Corp';
+          if (item.medicine.includes('Atorvastatin')) {
+            generic = 'Lipitor';
+            supplier = 'Aalee Pharma Distributors';
+          } else if (item.medicine.includes('Metformin')) {
+            generic = 'Glucophage';
+            supplier = 'Global Drug Sync Corp';
+          } else if (item.medicine.includes('Lisinopril')) {
+            generic = 'Zestril';
+            supplier = 'Apex Clinical Supplies';
+          } else if (item.medicine.includes('Insulin')) {
+            generic = 'Lantus';
+            supplier = 'MedX Prime Logistics';
+          }
+
+          let batch = `B-${item.medicine.substring(0, 3).toUpperCase()}${10 + idx}`;
+          
+          let level: 'Adequate' | 'Low Stock' | 'Out of Stock' = 'Adequate';
+          if (item.quantity === 0) level = 'Out of Stock';
+          else if (item.quantity < 20) level = 'Low Stock';
+
+          return {
+            id: `INV-0${idx + 1}`,
+            name: item.medicine,
+            generic,
+            units: item.quantity,
+            batchCode: batch,
+            expiry: item.expiry,
+            supplier,
+            status: level
+          };
+        });
+        setStock(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to load pharmacy inventory:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchInventory();
+  }, []);
+
   // Barcode Scanner Simulator triggering restock
   const triggerScanner = () => {
     setScannerOpen(true);
     setScannerScanning(true);
 
-    setTimeout(() => {
+    setTimeout(async () => {
       setScannerScanning(false);
       setScannerOpen(false);
       
-      // Simulate restocking Atorvastatin from 12 -> 62 units
-      setStock(prev => prev.map(item => {
-        if (item.name === 'Atorvastatin 20mg') {
-          return { ...item, units: item.units + 50, status: 'Adequate' };
+      try {
+        const res = await fetch('http://localhost:3001/api/pharmacies/inventory/restock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            medicine: 'Atorvastatin 20mg',
+            quantity: 50
+          })
+        });
+        if (res.ok) {
+          toastManager.addToast('UPC-A Barcode read: Atorvastatin 20mg. Restocked 50 units in database.', 'success');
+          fetchInventory();
         }
-        return item;
-      }));
-
-      toastManager.addToast('UPC-A Barcode read: Atorvastatin 20mg. Restocked 50 units in database.', 'success');
+      } catch (err) {
+        console.error(err);
+      }
     }, 3000);
   };
 
-  const handlePurchaseOrderSubmit = (e: React.FormEvent) => {
+  const handlePurchaseOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!poName.trim()) return;
 
-    // Simulate adding custom purchase order alert or updating matching drug stock
-    setStock(prev => prev.map(item => {
-      if (item.name.toLowerCase().includes(poName.toLowerCase())) {
-        return { ...item, units: item.units + Number(poQty), status: 'Adequate' };
+    try {
+      const res = await fetch('http://localhost:3001/api/pharmacies/inventory/restock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          medicine: poName,
+          quantity: poQty
+        })
+      });
+      if (res.ok) {
+        toastManager.addToast(`Purchase order issued: ${poQty} units of ${poName} ordered from ${poSupplier}.`, 'success');
+        setPurchaseOrderOpen(false);
+        setPoName('');
+        fetchInventory();
       }
-      return item;
-    }));
-
-    toastManager.addToast(`Purchase order issued: ${poQty} units of ${poName} ordered from ${poSupplier}.`, 'success');
-    setPurchaseOrderOpen(false);
-    setPoName('');
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const getStatusBadge = (status: StockItem['status']) => {

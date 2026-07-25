@@ -3,6 +3,7 @@ import { db } from '../database/db';
 import { broadcastEvent } from './stream';
 import { MedXEngine } from '../../src/core/MedXEngine';
 import { WorkflowOrchestrator } from '../services/WorkflowOrchestrator';
+import { apiKeys } from '../../src/config/apiKeys';
 
 const router = Router();
 
@@ -107,7 +108,7 @@ router.post('/orders/checkout', (req: Request, res: Response, next: NextFunction
           discount, delivery_fee, tax
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        orderId, patientId, medicineStr, totalQuantity, 0, 'Pending',
+        orderId, patientId, medicineStr, totalQuantity, 5, 'Pending',
         'Unassigned', 'Unassigned', '2 days', now, now,
         totalAmount, 'Success', paymentMethod, addressLine,
         discount || 0, deliveryFee || 0, tax || 0
@@ -193,14 +194,15 @@ router.post('/orders/ai-intake', async (req: Request, res: Response, next: NextF
   }
 
   try {
-    // Run AI orchestration pipeline in backend context (forces Mock mode)
-    const result = await MedXEngine.processRequest(patientId, query, 'Mock');
+    // Run AI orchestration pipeline in backend context
+    const mode = apiKeys.gemini ? 'Production' : 'Mock';
+    const result = await MedXEngine.processRequest(patientId, query, mode);
     const finalContext = result.finalContext;
     const xaiReport = finalContext.explainabilityReport;
 
     const eceOutput = finalContext.agentOutputs.find(o => o.agentId === 'ece')?.output;
     const eceLevel = eceOutput ? eceOutput.eceLevel : 5;
-    const facilityName = xaiReport ? xaiReport.facilityName : 'Care Pharmacy Store';
+    const facilityName = xaiReport ? xaiReport.facilityName : 'Care Pharmacy';
     const eta = xaiReport ? xaiReport.eta : '2 days';
 
     // 1. Update the corresponding order to Pending and map facility details
@@ -418,7 +420,7 @@ router.post('/orders/refill', async (req: Request, res: Response, next: NextFunc
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         orderId, patientId, `${medicineName} (x1)`, 1, 5, initialStatus,
-        'Care Pharmacy Store', 'Unassigned', '2 days', now, now,
+        'Care Pharmacy', 'Unassigned', '2 days', now, now,
         medicine.price, 'Success', 'Prescription Refill', 'Default Address',
         0, 5, medicine.price * 0.12
       );
@@ -511,7 +513,7 @@ router.post('/orders/sos', async (req: Request, res: Response, next: NextFunctio
   }
 });
 
-// P-05 Return & Refund Workflow
+// P-16 Return & Refund Workflow
 router.post('/orders/:id/return', async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
   const { reason } = req.body;
@@ -521,26 +523,41 @@ router.post('/orders/:id/return', async (req: Request, res: Response, next: Next
   }
 
   try {
-    db.prepare("UPDATE orders SET status = 'Return Requested' WHERE id = ?").run(id);
-    WorkflowOrchestrator.updateStage(id, 'RETURN_REVIEW');
-
-    setTimeout(() => {
-      const isApproved = reason !== 'Changed my mind';
-      const nextStatus = isApproved ? 'Refund Approved' : 'Refund Rejected';
-      const nextStage = isApproved ? 'REFUND_APPROVED' : 'REFUND_REJECTED';
-
-      db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(nextStatus, id);
-      WorkflowOrchestrator.updateStage(id, nextStage);
-      WorkflowOrchestrator.updateStage(id, 'COMPLETED');
-    }, 3000);
-
-    res.json({ success: true, message: 'Return request submitted. Pending pharmacy review.' });
+    db.prepare("UPDATE orders SET status = 'Waiting for Pharmacy Response', return_reason = ? WHERE id = ?").run(reason, id);
+    WorkflowOrchestrator.updateStage(id, 'RETURN_PENDING');
+    res.json({ success: true, message: 'Return request submitted. Waiting for Pharmacy Response.' });
   } catch (err) {
     next(err);
   }
 });
 
-// P-08 Blood Request Workflow
+// P-16 Pharmacy accepts return request
+router.post('/orders/:id/return-accept', async (req: Request, res: Response, next: NextFunction) => {
+  const { id } = req.params;
+  try {
+    db.prepare("UPDATE orders SET status = 'Refund Approved' WHERE id = ?").run(id);
+    WorkflowOrchestrator.updateStage(id, 'REFUND_APPROVED');
+    WorkflowOrchestrator.updateStage(id, 'COMPLETED');
+    res.json({ success: true, message: 'Return request accepted.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// P-16 Pharmacy rejects return request
+router.post('/orders/:id/return-reject', async (req: Request, res: Response, next: NextFunction) => {
+  const { id } = req.params;
+  try {
+    db.prepare("UPDATE orders SET status = 'Refund Rejected' WHERE id = ?").run(id);
+    WorkflowOrchestrator.updateStage(id, 'REFUND_REJECTED');
+    WorkflowOrchestrator.updateStage(id, 'COMPLETED');
+    res.json({ success: true, message: 'Return request rejected.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// P-19 Blood Request Workflow (Intelligent Allocation)
 router.post('/orders/blood', async (req: Request, res: Response, next: NextFunction) => {
   const { patientId, bloodGroup, quantity, reason } = req.body;
   if (!patientId || !bloodGroup || !quantity) {
@@ -552,30 +569,47 @@ router.post('/orders/blood', async (req: Request, res: Response, next: NextFunct
     const orderId = 'REQ-' + Math.floor(100000 + Math.random() * 900000);
     const now = Date.now();
 
-    const bBank = db.prepare('SELECT quantity FROM blood_banks WHERE blood_group = ?').get(bloodGroup) as { quantity: number } | undefined;
-    if (!bBank || bBank.quantity < quantity) {
-      res.status(400).json({ success: false, message: `Insufficient units of Blood Group ${bloodGroup} available.` });
+    // 1. Query all blood bank facility stocks
+    const eligibleBanks = db.prepare(`
+      SELECT b.facility_id, b.quantity, f.name as facility_name
+      FROM blood_banks b
+      JOIN facilities f ON b.facility_id = f.id
+      WHERE b.blood_group = ? AND b.quantity >= ?
+    `).all(bloodGroup, quantity) as { facility_id: string; quantity: number; facility_name: string }[];
+
+    if (eligibleBanks.length === 0) {
+      res.status(400).json({ success: false, message: `No blood banks currently have ${quantity} units of Blood Group ${bloodGroup} available.` });
       return;
     }
 
-    db.transaction(() => {
-      db.prepare('UPDATE blood_banks SET quantity = MAX(0, quantity - ?) WHERE blood_group = ?').run(quantity, bloodGroup);
+    // 2. Select the first eligible blood bank
+    const selectedBank = eligibleBanks[0];
 
+    db.transaction(() => {
+      // 3. Deduct stock from the selected facility only
+      db.prepare(`
+        UPDATE blood_banks 
+        SET quantity = MAX(0, quantity - ?) 
+        WHERE facility_id = ? AND blood_group = ?
+      `).run(quantity, selectedBank.facility_id, bloodGroup);
+
+      // 4. Insert order mapped to the selected blood bank
       db.prepare(`
         INSERT INTO orders (
           id, patient_id, medicine, quantity, ece_level, status, 
           assigned_pharmacy, assigned_rider, eta, created_at, updated_at,
           total_amount, payment_status, payment_method, address_line,
           discount, delivery_fee, tax, request_source, request_type,
-          blood_group, blood_units
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Patient', 'Blood', ?, ?)
+          blood_group, blood_units, facility_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Patient', 'Blood', ?, ?, ?)
       `).run(
         orderId, patientId, `Blood Group ${bloodGroup}`, quantity, 2, 'Pending',
-        'Central Red Cross Blood Bank', 'Drone: DR-99', '20 mins', now, now,
+        selectedBank.facility_name, 'Drone: DR-99', '20 mins', now, now,
         0, 'Success', 'Blood Request', 'Default Address',
-        0, 0, 0, bloodGroup, quantity
+        0, 0, 0, bloodGroup, quantity, selectedBank.facility_id
       );
 
+      // 5. Insert order item
       db.prepare(`
         INSERT INTO order_items (id, order_id, medicine_name, price, quantity)
         VALUES (?, ?, ?, ?, ?)
@@ -596,7 +630,11 @@ router.post('/orders/blood', async (req: Request, res: Response, next: NextFunct
       }, 1500);
     }, 1500);
 
-    res.json({ success: true, message: `Blood request ${orderId} submitted and reserved.`, orderId });
+    res.json({ 
+      success: true, 
+      message: `Blood request ${orderId} successfully submitted. Reserved ${quantity} units of ${bloodGroup} from ${selectedBank.facility_name}.`, 
+      orderId 
+    });
   } catch (err) {
     next(err);
   }

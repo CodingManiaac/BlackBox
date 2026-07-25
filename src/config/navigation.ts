@@ -35,7 +35,7 @@ export const NAVIGATION_CONFIG: Record<UserRole, NavItem[]> = {
   BloodBank: [
     { name: 'Dashboard', path: '/bloodbank', icon: 'Home' },
     { name: 'Blood Inventory', path: '/bloodbank/inventory', icon: 'Archive' },
-    { name: 'Hospital Requests', path: '/bloodbank/requests', icon: 'Send' },
+    { name: 'Requests', path: '/bloodbank/requests', icon: 'Send' },
     { name: 'Dispatch', path: '/bloodbank/dispatch', icon: 'Truck' },
     { name: 'Expiry Monitoring', path: '/bloodbank/expiry', icon: 'Clock' },
     { name: 'Analytics', path: '/bloodbank/analytics', icon: 'BarChart2' },

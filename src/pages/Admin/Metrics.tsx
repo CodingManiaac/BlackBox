@@ -3,8 +3,18 @@ import PageHeader from '../../components/common/PageHeader';
 import MetricsCard from '../../components/widgets/MetricsCard';
 import { PerformanceMetrics } from '../../monitoring/MetricsCollector';
 
+interface ExtendedMetrics extends PerformanceMetrics {
+  totalUsers?: number;
+  totalOrders?: number;
+  activePharmacies?: number;
+  activeBloodBanks?: number;
+  activeHospitals?: number;
+  emergencyRequests?: number;
+  workflowCompletionRate?: string;
+}
+
 export const Metrics: React.FC = () => {
-  const [metrics, setMetrics] = useState<PerformanceMetrics>({
+  const [metrics, setMetrics] = useState<ExtendedMetrics>({
     totalRequests: 0,
     successCount: 0,
     failureCount: 0,
@@ -84,6 +94,20 @@ export const Metrics: React.FC = () => {
           subValue={`Lowest latency: ${metrics.fastestAgent.latencyMs} ms`}
           icon="🐇"
         />
+      </div>
+
+      {/* Dynamic Admin Analytics Section */}
+      <div style={{ marginTop: '32px' }}>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 700 }}>System Admin Analytics</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '24px' }}>
+          <MetricsCard title="Total Users" value={metrics.totalUsers ?? 0} subValue="Registered accounts" icon="👥" />
+          <MetricsCard title="Total Orders" value={metrics.totalOrders ?? 0} subValue="Database records" icon="📦" />
+          <MetricsCard title="Active Pharmacies" value={metrics.activePharmacies ?? 0} subValue="Locations" icon="🏥" />
+          <MetricsCard title="Active Blood Banks" value={metrics.activeBloodBanks ?? 0} subValue="Facilities" icon="🩸" />
+          <MetricsCard title="Active Hospitals" value={metrics.activeHospitals ?? 0} subValue="Clinical sites" icon="🏛️" />
+          <MetricsCard title="Emergency Requests" value={metrics.emergencyRequests ?? 0} subValue="ECE Severity <= 2" icon="🚨" />
+          <MetricsCard title="Workflow Completion Rate" value={metrics.workflowCompletionRate ?? '100%'} subValue="Pipeline throughput" icon="✅" />
+        </div>
       </div>
     </div>
   );

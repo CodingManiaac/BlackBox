@@ -13,7 +13,7 @@
       "etaMins": 11
     },
     {
-      "name": "Care Pharmacy Store",
+      "name": "Care Pharmacy",
       "type": "Pharmacy",
       "distanceKm": 0.8,
       "etaMins": 3
@@ -25,7 +25,7 @@
       "etaMins": 15
     },
     {
-      "name": "Central Red Cross Blood Bank",
+      "name": "Red Cross Blood Bank",
       "type": "BloodBank",
       "distanceKm": 2.1,
       "etaMins": 7

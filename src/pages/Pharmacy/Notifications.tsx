@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PageHeader from '../../components/common/PageHeader';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
@@ -16,22 +16,89 @@ interface PharmacyNotification {
 
 export const Notifications: React.FC = () => {
   const toastManager = useToast();
+  const [alerts, setAlerts] = useState<PharmacyNotification[]>([]);
 
-  const [alerts, setAlerts] = useState<PharmacyNotification[]>([
-    { id: '1', title: 'Emergency SOS Order #8834', category: 'Emergency', description: 'Immediate coordinates dispatch requested for Insulin Glargine by Metro Cardiology Clinic.', time: '3 mins ago' },
-    { id: '2', title: 'Low Stock: Atorvastatin 20mg', category: 'Low Stock', description: 'Inventory count dropped to 12 units. Restocking order recommended.', time: '1 hour ago' },
-    { id: '3', title: 'Batch Lot Expiry Watch: Insulin', category: 'Expiry Warning', description: 'Batch B-INS02 expiry date is within 60 days (Sep 8, 2026). Plan depletion.', time: 'Today' },
-    { id: '4', title: 'DPDP Security Sync Update', category: 'System', description: 'Completed database security protocol syncs. Active ledger logs secured.', time: 'Yesterday' }
-  ]);
+  const getPharmacyName = () => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.name || 'Care Pharmacy';
+      } catch (e) {}
+    }
+    return 'Care Pharmacy';
+  };
+  const pharmacyName = getPharmacyName();
 
-  const handleDismiss = (id: string) => {
-    setAlerts(prev => prev.filter(al => al.id !== id));
-    toastManager.addToast('Notification alarm dismissed.', 'info');
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/workflow/notifications/role?role=pharmacy&recipientId=${encodeURIComponent(pharmacyName)}`);
+      const data = await res.json();
+      if (data.success) {
+        const mapped: PharmacyNotification[] = data.notifications.map((n: any) => {
+          let category: 'Emergency' | 'Low Stock' | 'Expiry Warning' | 'System' = 'System';
+          let title = 'System Update';
+          if (n.message.toLowerCase().includes('emergency') || n.message.toLowerCase().includes('critical') || n.message.toLowerCase().includes('life threatening')) {
+            category = 'Emergency';
+            title = 'Emergency Notification';
+          } else if (n.message.toLowerCase().includes('low stock') || n.message.toLowerCase().includes('inventory shortage') || n.message.toLowerCase().includes('buffer limit')) {
+            category = 'Low Stock';
+            title = 'Low Stock Alert';
+          } else if (n.message.toLowerCase().includes('expiry') || n.message.toLowerCase().includes('vials') || n.message.toLowerCase().includes('expired')) {
+            category = 'Expiry Warning';
+            title = 'Expiry Warning Watch';
+          } else if (n.message.toLowerCase().includes('order') || n.message.toLowerCase().includes('request') || n.message.toLowerCase().includes('accepted') || n.message.toLowerCase().includes('cancell')) {
+            category = 'Emergency';
+            title = 'Order Status Change';
+          }
+          return {
+            id: n.id,
+            title: title,
+            category: category,
+            description: n.message,
+            time: new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          };
+        });
+        setAlerts(mapped);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const clearAllAlerts = () => {
-    setAlerts([]);
-    toastManager.addToast('All pharmacy notifications cleared.', 'success');
+  useEffect(() => {
+    fetchNotifications();
+
+    const eventSource = new EventSource('http://localhost:3001/api/workflow/stream');
+    eventSource.onmessage = () => {
+      fetchNotifications();
+    };
+
+    return () => eventSource.close();
+  }, []);
+
+  const handleDismiss = async (id: string) => {
+    try {
+      await fetch(`http://localhost:3001/api/workflow/notifications/${id}/read`, { method: 'POST' });
+      fetchNotifications();
+      toastManager.addToast('Notification dismissed.', 'info');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const clearAllAlerts = async () => {
+    try {
+      await fetch('http://localhost:3001/api/workflow/notifications/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'pharmacy', recipientId: pharmacyName })
+      });
+      fetchNotifications();
+      toastManager.addToast('All pharmacy notifications cleared.', 'success');
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const getAlertIcon = (category: PharmacyNotification['category']) => {

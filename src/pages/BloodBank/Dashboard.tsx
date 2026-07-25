@@ -7,6 +7,7 @@ import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import { useNavigation } from '../../hooks/useNavigation';
 import { Thermometer, ShieldAlert, ArrowRight } from 'lucide-react';
+import ActivityFeed, { ActivityItem } from '../../components/widgets/ActivityFeed';
 
 interface BloodRequisition {
   id: string;
@@ -24,11 +25,64 @@ export const Dashboard: React.FC = () => {
   const [temperature, setTemperature] = useState(4.2);
   const [alarmActive, setAlarmActive] = useState(false);
   const [pendingList, setPendingList] = useState<BloodRequisition[]>([]);
+  const [totalBloodUnits, setTotalBloodUnits] = useState(112);
+  const [reservedUnits, setReservedUnits] = useState(0);
+  const [availableUnits, setAvailableUnits] = useState(112);
+  const [dispatchCount, setDispatchCount] = useState(0);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  const getFacilityId = () => {
+    const session = localStorage.getItem('medx_session');
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        return parsed.associatedId || 'FAC-005';
+      } catch (e) {}
+    }
+    return 'FAC-005';
+  };
+  const facilityId = getFacilityId();
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/workflow/notifications/role?role=blood_bank&recipientId=${facilityId}`);
+      const data = await res.json();
+      if (data.success) {
+        setNotifications(data.notifications);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleNotificationClick = async (id: string) => {
+    try {
+      await fetch(`http://localhost:3001/api/workflow/notifications/${id}/read`, { method: 'POST' });
+      fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleNotificationClearAll = async () => {
+    try {
+      await fetch('http://localhost:3001/api/workflow/notifications/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'blood_bank', recipientId: facilityId })
+      });
+      fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const kpis = [
-    { title: 'Total Blood Units', value: '112 Packs', badgeText: 'Optimal', badgeVariant: 'success' as const, desc: '38 O- Packs Reserved' },
-    { title: 'Expiring Vials (7d)', value: '4 Packs', badgeText: 'Action Needed', badgeVariant: 'warning' as const, desc: 'Redistribution suggested' },
-    { title: 'Pending Requisitions', value: `${pendingList.length} Orders`, badgeText: 'Syncing', badgeVariant: 'info' as const, desc: 'Average dispatch: 12m' },
+    { title: 'Total Blood Units', value: `${totalBloodUnits} Packs`, badgeText: totalBloodUnits === 0 ? 'Stockout' : 'Optimal', badgeVariant: totalBloodUnits === 0 ? 'danger' as const : 'success' as const, desc: 'Live SQL Inventory' },
+    { title: 'Reserved Units', value: `${reservedUnits} Packs`, badgeText: 'Reserved', badgeVariant: 'warning' as const, desc: 'Awaiting dispatch' },
+    { title: 'Available Units', value: `${availableUnits} Packs`, badgeText: 'Ready', badgeVariant: 'success' as const, desc: 'Unassigned blood stock' },
+    { title: 'Dispatch Count', value: `${dispatchCount} Shipments`, badgeText: 'Delivered', badgeVariant: 'info' as const, desc: 'Successful transfers' },
+    { title: 'Pending Requisitions', value: `${pendingList.length} Orders`, badgeText: 'Syncing', badgeVariant: 'info' as const, desc: 'Needs dispatch' },
     { 
       title: 'Fridge Temperature', 
       value: `${temperature.toFixed(1)}°C`, 
@@ -53,13 +107,16 @@ export const Dashboard: React.FC = () => {
       try {
         const res = await fetch('http://localhost:3001/api/orders');
         const data = await res.json();
+        let matchedOrders = [];
         if (data.success) {
-          const mapped: BloodRequisition[] = data.orders
-            .filter((o: any) => o.medicine.toLowerCase().includes('blood') || o.medicine === 'O-' || o.medicine === 'O Negative' || o.medicine === 'A+' || o.medicine === 'B+' || o.medicine === 'AB-')
+          matchedOrders = data.orders.filter((o: any) => 
+            (o.request_type === 'Blood' || o.medicine.toLowerCase().includes('blood') || o.medicine === 'O-' || o.medicine === 'O Negative' || o.medicine === 'A+' || o.medicine === 'B+' || o.medicine === 'AB-')
+          );
+          const mapped: BloodRequisition[] = matchedOrders
             .filter((o: any) => o.status === 'Pending')
             .map((o: any) => ({
               id: `BRQ-${o.id.substring(4)}`,
-              facility: o.assigned_pharmacy || 'Central Red Cross Blood Bank',
+              facility: o.assigned_pharmacy || 'Red Cross Blood Bank',
               bloodType: o.medicine === 'O Negative' ? 'O-' : o.medicine,
               quantity: o.quantity,
               timeAwaiting: 'Just Now',
@@ -67,16 +124,50 @@ export const Dashboard: React.FC = () => {
             }));
           setPendingList(mapped);
         }
+
+        const session = localStorage.getItem('medx_session');
+        let facilityId = 'FAC-005';
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            facilityId = parsed.associatedId || 'FAC-005';
+          } catch (e) {}
+        }
+        
+        const bloodRes = await fetch('http://localhost:3001/api/hospitals/blood');
+        const bloodData = await bloodRes.json();
+        let totalUnits = 0;
+        if (bloodData.success) {
+          const facilityStock = bloodData.blood.filter((b: any) => b.facility_id === facilityId);
+          totalUnits = facilityStock.reduce((acc: number, b: any) => acc + b.quantity, 0);
+          setTotalBloodUnits(totalUnits);
+        }
+
+        if (data.success) {
+          const reserved = matchedOrders
+            .filter((o: any) => o.status === 'Pending' || o.status === 'Dispatched')
+            .reduce((acc: number, o: any) => acc + o.quantity, 0);
+            
+          const completedDispatches = matchedOrders
+            .filter((o: any) => o.status === 'Delivered')
+            .length;
+            
+          setReservedUnits(reserved);
+          setAvailableUnits(totalUnits - reserved);
+          setDispatchCount(completedDispatches);
+        }
       } catch (err) {
-        console.error('Failed to load blood requisitions:', err);
+        console.error('Failed to load blood requisitions/stock:', err);
       }
     };
 
     fetchRealRequests();
+    fetchNotifications();
 
     const eventSource = new EventSource('http://localhost:3001/api/workflow/stream');
     eventSource.onmessage = () => {
       fetchRealRequests();
+      fetchNotifications();
     };
 
     return () => eventSource.close();
@@ -253,6 +344,21 @@ export const Dashboard: React.FC = () => {
               </Button>
             </div>
           </Card>
+
+          {/* Blood Bank Alerts Feed */}
+          <ActivityFeed 
+            title="Blood Bank Alerts & Notifications" 
+            activities={notifications.map((n: any) => ({
+              id: n.id,
+              title: n.read === 1 ? 'Read Alert' : 'Unread Alert',
+              time: new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              description: n.message,
+              badgeText: n.read === 1 ? 'Read' : 'New',
+              badgeVariant: n.read === 1 ? ('success' as const) : ('warning' as const)
+            }))}
+            onItemClick={handleNotificationClick}
+            onClearAll={handleNotificationClearAll}
+          />
 
         </div>
 

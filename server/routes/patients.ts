@@ -37,7 +37,21 @@ router.get('/:id/notifications', (req: Request, res: Response, next: NextFunctio
 router.put('/:id/settings', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const settings = req.body;
+    const body = req.body;
+    const settings = {
+      name: body.name,
+      email: body.email,
+      address_line: body.addressLine,
+      city: body.city,
+      zip_code: body.zipCode,
+      emergency_contacts: body.emergencyContacts,
+      sms_notify: body.smsNotify,
+      email_notify: body.emailNotify,
+      language: body.language,
+      consent_active: body.consentActive,
+      allergies: body.allergies,
+      profile_photo: body.profilePhoto
+    };
     PatientRepository.updateSettings(id, settings);
     res.json({ success: true, message: 'Settings saved successfully.' });
   } catch (err) {
@@ -48,7 +62,7 @@ router.put('/:id/settings', (req: Request, res: Response, next: NextFunction) =>
 router.delete('/:id/notifications', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    db.prepare('DELETE FROM notifications WHERE patient_id = ?').run(id);
+    db.prepare("DELETE FROM notifications WHERE recipient_role = 'patient' AND recipient_id = ?").run(id);
     res.json({ success: true, message: 'Notifications cleared.' });
   } catch (err) {
     next(err);

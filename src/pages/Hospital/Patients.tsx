@@ -31,7 +31,7 @@ export const Patients: React.FC = () => {
   const [patients, setPatients] = useState<PatientRecord[]>([
     {
       id: 'PT-9011',
-      name: 'Vishu Kumar',
+      name: 'Vincent Cole',
       age: 29,
       gender: 'Male',
       status: 'Admitted - General Ward',

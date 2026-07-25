@@ -9,7 +9,9 @@
     "lint": "echo 'No linting configured'",
     "preview": "vite preview",
     "demo": "npx tsx src/demo.ts",
-    "server": "npx tsx server/index.ts"
+    "server": "npx tsx server/index.ts",
+    "check-db": "node read_db.cjs",
+    "verify-gemini": "npx tsx C:/Users/vishu/.gemini/antigravity/brain/9257aacf-4bbb-429e-b9c4-2b4d3c49d6b7/scratch/verify_gemini.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",

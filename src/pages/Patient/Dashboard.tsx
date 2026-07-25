@@ -65,15 +65,41 @@ export const Dashboard: React.FC = () => {
     { title: 'Oxygen Level (SpO2)', value: '98%', badgeText: 'Healthy', badgeVariant: 'success' as const, desc: 'Synced from wearables' }
   ];
 
-  // Map to chronological order (oldest first)
-  const healthAlerts: ActivityItem[] = [...notifications].reverse().map((n: any) => ({
+  // Map notifications
+  const healthAlerts: ActivityItem[] = [...notifications].map((n: any) => ({
     id: n.id,
-    title: 'Workflow Event Update',
+    title: n.read === 1 ? 'Read Alert' : 'Unread Alert',
     time: new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     description: n.message,
-    badgeText: 'Live Feed',
-    badgeVariant: 'info'
+    badgeText: n.read === 1 ? 'Read' : 'New',
+    badgeVariant: n.read === 1 ? ('success' as const) : ('warning' as const)
   }));
+
+  const handleItemClick = async (id: string) => {
+    try {
+      await fetch(`http://localhost:3001/api/workflow/notifications/${id}/read`, { method: 'POST' });
+      fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      const session = localStorage.getItem('medx_session');
+      let patientId = 'PAT-001';
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          patientId = parsed.associatedId || 'PAT-001';
+        } catch (e) {}
+      }
+      await fetch(`http://localhost:3001/api/patients/${patientId}/notifications`, { method: 'DELETE' });
+      fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const appointmentSteps: TimelineStep[] = [
     { id: '1', title: 'Consultation with Dr. Jenkins', description: 'Cardiology Clinic consultation regarding diagnostics review.', time: 'July 18, 10:00 AM', status: 'active' },
@@ -211,7 +237,12 @@ export const Dashboard: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           
           {/* Health Alerts */}
-          <ActivityFeed title="Active Health Alerts" activities={healthAlerts} />
+          <ActivityFeed 
+            title="Active Health Alerts" 
+            activities={healthAlerts} 
+            onItemClick={handleItemClick}
+            onClearAll={handleClearAll}
+          />
 
           {/* Appointment Timeline */}
           <Timeline title="Upcoming Care Schedule" steps={appointmentSteps} />

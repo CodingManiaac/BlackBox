@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PageHeader from '../../components/common/PageHeader';
 import Table, { Column } from '../../components/common/Table';
 import Badge from '../../components/common/Badge';
@@ -38,24 +38,79 @@ export const BloodInventory: React.FC = () => {
   const [restockComponent, setRestockComponent] = useState<'wholeBlood' | 'plasma' | 'platelets'>('wholeBlood');
   const [restockQty, setRestockQty] = useState(5);
 
-  const handleRestock = (e: React.FormEvent) => {
-    e.preventDefault();
-    setInventory(prev => prev.map(item => {
-      if (item.group === restockGroup) {
-        return {
-          ...item,
-          [restockComponent]: item[restockComponent] + restockQty
-        };
+  const fetchInventory = async () => {
+    try {
+      const session = localStorage.getItem('medx_session');
+      let facilityId = 'FAC-005';
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          facilityId = parsed.associatedId || 'FAC-005';
+        } catch (e) {}
       }
-      return item;
-    }));
 
-    toastManager.addToast(`Restocked ${restockQty} packs of ${restockGroup} (${restockComponent === 'wholeBlood' ? 'Whole Blood' : restockComponent === 'plasma' ? 'Plasma' : 'Platelets'}).`, 'success');
-    setRestockOpen(false);
+      const res = await fetch('http://localhost:3001/api/hospitals/blood');
+      const data = await res.json();
+      if (data.success) {
+        const facilityStock = data.blood.filter((b: any) => b.facility_id === facilityId);
+        
+        setInventory(prev => prev.map(item => {
+          const dbItem = facilityStock.find((b: any) => b.blood_group === item.group);
+          if (dbItem) {
+            return {
+              ...item,
+              wholeBlood: dbItem.quantity
+            };
+          }
+          return item;
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to load blood bank inventory:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchInventory();
+  }, []);
+
+  const handleRestock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const session = localStorage.getItem('medx_session');
+      let facilityId = 'FAC-005';
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          facilityId = parsed.associatedId || 'FAC-005';
+        } catch (e) {}
+      }
+
+      const res = await fetch('http://localhost:3001/api/hospitals/blood/restock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facilityId,
+          bloodGroup: restockGroup,
+          quantity: restockQty
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toastManager.addToast(`Restocked ${restockQty} packs of ${restockGroup} (${restockComponent === 'wholeBlood' ? 'Whole Blood' : restockComponent === 'plasma' ? 'Plasma' : 'Platelets'}).`, 'success');
+        setRestockOpen(false);
+        fetchInventory();
+      } else {
+        toastManager.addToast(data.message || 'Restock failed.', 'error');
+      }
+    } catch (err) {
+      console.error('Restock error:', err);
+      toastManager.addToast('Restock failed.', 'error');
+    }
   };
 
   const getStockStatusBadge = (total: number) => {
-    if (total === 0) return <Badge variant="danger">Stockout</Badge>;
+    if (total === 0) return <Badge variant="danger">Out of Stock</Badge>;
     if (total < 10) return <Badge variant="warning">Critical</Badge>;
     return <Badge variant="success">Adequate</Badge>;
   };
