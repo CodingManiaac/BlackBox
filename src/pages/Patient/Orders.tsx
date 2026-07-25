@@ -101,11 +101,10 @@ export const Orders: React.FC = () => {
             tax: o.tax || 0,
             eceLevel: o.ece_level
           }));
-          
           setOrders(mapped);
           setTotalCount(mapped.length);
-          setCompletedCount(mapped.filter(o => o.status === 'Delivered').length);
-          setCancelledCount(mapped.filter(o => o.status === 'Cancelled').length);
+          setCompletedCount(mapped.filter(o => ['Delivered', 'Reached Customer', 'COMPLETED', 'DELIVERED', 'Refund Approved', 'Refunded'].includes(o.status)).length);
+          setCancelledCount(mapped.filter(o => ['Cancelled', 'Failed', 'Refund Rejected'].includes(o.status)).length);
           setSpending(mapped.reduce((sum, o) => sum + o.cost, 0));
         }
       } catch (err) {
@@ -162,7 +161,7 @@ export const Orders: React.FC = () => {
     toastManager.addToast(`Refund requested for order ${orderId}.`, 'warning');
   };
 
-  const activeOrders = orders.filter(o => o.status !== 'Delivered' && o.status !== 'Cancelled' && o.status !== 'Refunded');
+  const activeOrders = orders.filter(o => !['Delivered', 'Reached Customer', 'COMPLETED', 'DELIVERED', 'Cancelled', 'Failed', 'Refunded', 'Refund Approved'].includes(o.status));
 
   const getStatusBadge = (status: PatientOrder['status']) => {
     switch(status) {

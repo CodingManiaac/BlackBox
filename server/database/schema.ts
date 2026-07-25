@@ -202,4 +202,11 @@ CREATE TABLE IF NOT EXISTS drones (
   battery INTEGER NOT NULL,
   status TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS magic_links (
+  email TEXT NOT NULL,
+  token TEXT NOT NULL PRIMARY KEY,
+  role TEXT NOT NULL,
+  expires_at INTEGER NOT NULL
+);
 `;
