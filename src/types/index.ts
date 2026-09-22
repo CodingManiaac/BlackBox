@@ -14,7 +14,7 @@ export interface RoleMetadata {
   description: string;
 }
 
-export type ToastType = 'success' | 'warning' | 'error' | 'info';
+export type ToastType = 'success' | 'warning' | 'error' | 'info' | 'danger';
 
 export interface Toast {
   id: string;

@@ -28,7 +28,9 @@ export interface RequestContext {
   readonly agentOutputs: readonly AgentOutput[];
   readonly executionTimeline: readonly ExecutionTimelineEntry[];
   readonly systemWarnings: readonly string[];
-  
+  readonly requestType?: string;
+  readonly requestSource?: string;
+
   // Explainable AI Enrichments (Phase 11)
   readonly decisionTrace?: readonly DecisionTraceStep[];
   readonly riskLevel?: RiskLevel;
