@@ -66,10 +66,20 @@ app.use('/api/demo', demoRouter);
 app.use('/api/auth', authRouter);
 app.use('/api', commerceRouter);
 
+// Serve static frontend build in production
+const distPath = path.resolve('dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
+
 app.use(errorHandler);
 
 app.listen(PORT, () => {
-  console.log(`[Backend] MedXNet Unified Data Server running on http://localhost:${PORT}`);
+  console.log(`[Backend] MedXNet Unified Data Server running on port ${PORT}`);
 });
 export default app;
 // Hot-reload trigger: Seed update 6.4.17
