@@ -39,7 +39,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ role, title, onMenuToggle 
       const parsed = JSON.parse(session);
       if (parsed.role === 'Patient') {
         const patientId = parsed.associatedId || 'PAT-001';
-        const res = await fetch(`http://localhost:3001/api/patients/${patientId}`);
+        const res = await fetch(`${API_BASE_URL}/api/patients/${patientId}`);
         const data = await res.json();
         if (data.success && data.patient) {
           setProfileName(data.patient.name || 'John Doe');
@@ -62,7 +62,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ role, title, onMenuToggle 
         const parsed = JSON.parse(session);
         patientId = parsed.associatedId || 'PAT-001';
       }
-      const res = await fetch(`http://localhost:3001/api/patients/${patientId}/notifications`);
+      const res = await fetch(`${API_BASE_URL}/api/patients/${patientId}/notifications`);
       const data = await res.json();
       if (data.success) {
         setNotifications(data.notifications);
@@ -76,7 +76,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ role, title, onMenuToggle 
     fetchNotifications();
     fetchProfile();
 
-    const eventSource = new EventSource('http://localhost:3001/api/workflow/stream');
+    const eventSource = new EventSource(`${API_BASE_URL}/api/workflow/stream`);
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -200,7 +200,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ role, title, onMenuToggle 
                       const parsed = JSON.parse(session);
                       patientId = parsed.associatedId || 'PAT-001';
                     }
-                    await fetch(`http://localhost:3001/api/patients/${patientId}/notifications`, { method: 'DELETE' });
+                    await fetch(`${API_BASE_URL}/api/patients/${patientId}/notifications`, { method: 'DELETE' });
                     addToast('Cleared all notifications.', 'success');
                     fetchNotifications();
                   } catch (e) {}

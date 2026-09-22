@@ -1,8 +1,8 @@
-// Centralized API Base URL configuration for local dev and cloud deployment (Render, Vercel, Netlify)
+// Centralized API Base URL configuration & production fetch interceptor
 export const getApiBaseUrl = (): string => {
   // 1. Environment variable override (e.g. VITE_API_BASE_URL=https://my-app.onrender.com)
   const envUrl = typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_BASE_URL;
-  if (envUrl) {
+  if (envUrl && envUrl !== 'http://localhost:3001') {
     return envUrl.replace(/\/$/, '');
   }
 
@@ -19,4 +19,29 @@ export const getApiBaseUrl = (): string => {
 };
 
 export const API_BASE_URL = getApiBaseUrl();
+
+// Global production request interceptor: automatically redirects any legacy 'http://localhost:3001' calls
+if (typeof window !== 'undefined') {
+  const targetBaseUrl = getApiBaseUrl();
+  if (targetBaseUrl !== 'http://localhost:3001') {
+    const originalFetch = window.fetch;
+    window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
+      if (typeof input === 'string' && input.includes('http://localhost:3001')) {
+        const updatedUrl = input.replace('http://localhost:3001', targetBaseUrl);
+        return originalFetch(updatedUrl, init);
+      }
+      return originalFetch(input, init);
+    };
+
+    const OriginalEventSource = window.EventSource;
+    window.EventSource = function (url: string | URL, eventSourceInitDict?: EventSourceInit) {
+      let urlStr = typeof url === 'string' ? url : url.toString();
+      if (urlStr.includes('http://localhost:3001')) {
+        urlStr = urlStr.replace('http://localhost:3001', targetBaseUrl);
+      }
+      return new OriginalEventSource(urlStr, eventSourceInitDict);
+    } as any;
+  }
+}
+
 export default getApiBaseUrl;

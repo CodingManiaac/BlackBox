@@ -8,6 +8,7 @@ import Modal from '../../components/common/Modal';
 import { useToast } from '../../hooks/useToast';
 import { FileText } from 'lucide-react';
 import KPICard from '../../components/widgets/KPICard';
+import { API_BASE_URL } from '../../config/api';
 
 interface PatientOrder {
   id: string;
@@ -53,7 +54,7 @@ export const Orders: React.FC = () => {
   const handleSubmitReturn = async () => {
     if (!returnOrderId) return;
     try {
-      const res = await fetch(`http://localhost:3001/api/orders/${returnOrderId}/return`, {
+      const res = await fetch(`${API_BASE_URL}/api/orders/${returnOrderId}/return`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: returnReason })
@@ -82,7 +83,7 @@ export const Orders: React.FC = () => {
           } catch (e) {}
         }
 
-        const res = await fetch('http://localhost:3001/api/orders');
+        const res = await fetch(`${API_BASE_URL}/api/orders`);
         const data = await res.json();
         if (data.success) {
           const userOrders = data.orders.filter((o: any) => o.patient_id === patientId);
@@ -114,7 +115,7 @@ export const Orders: React.FC = () => {
 
     fetchRealOrders();
 
-    const eventSource = new EventSource('http://localhost:3001/api/workflow/stream');
+    const eventSource = new EventSource(`${API_BASE_URL}/api/workflow/stream`);
     eventSource.onmessage = () => {
       fetchRealOrders();
     };
