@@ -32,40 +32,58 @@ export const LoginPage: React.FC = () => {
     }
 
     setIsLoading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: signUpName,
-          email: signUpEmail,
-          password: signUpPassword,
-          phone: signUpPhone,
-          address: signUpAddress,
-          emergencyContact: signUpEmergency
-        })
-      });
-      const data = await response.json();
-      setIsLoading(false);
+    const rawUrl = localStorage.getItem('medx_api_url') || (import.meta as any).env?.VITE_API_BASE_URL || API_BASE_URL || 'http://localhost:3001';
+    const activeUrl = rawUrl.replace(/\/$/, '');
 
-      if (response.ok && data.success) {
-        addToast('Registration successful! Please log in.', 'success');
-        setIsSignUp(false);
-        setUsername(signUpEmail);
-        setSignUpName('');
-        setSignUpEmail('');
-        setSignUpPassword('');
-        setSignUpPhone('');
-        setSignUpAddress('');
-        setSignUpEmergency('');
-      } else {
-        addToast(data.message || 'Registration failed.', 'error');
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      attempts++;
+      try {
+        if (attempts > 1) {
+          addToast(`Waking up server (Attempt ${attempts}/${maxAttempts})... Please wait.`, 'info');
+        }
+
+        const response = await fetch(`${activeUrl}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: signUpName,
+            email: signUpEmail,
+            password: signUpPassword,
+            phone: signUpPhone,
+            address: signUpAddress,
+            emergencyContact: signUpEmergency
+          })
+        });
+        const data = await response.json();
+        setIsLoading(false);
+
+        if (response.ok && data.success) {
+          addToast('Registration successful! Please log in.', 'success');
+          setIsSignUp(false);
+          setUsername(signUpEmail);
+          setSignUpName('');
+          setSignUpEmail('');
+          setSignUpPassword('');
+          setSignUpPhone('');
+          setSignUpAddress('');
+          setSignUpEmergency('');
+        } else {
+          addToast(data.message || 'Registration failed.', 'error');
+        }
+        return;
+      } catch (err) {
+        console.warn(`[SignUp] Attempt ${attempts} failed:`, err);
+        if (attempts < maxAttempts) {
+          await new Promise(res => setTimeout(res, 2500));
+        }
       }
-    } catch (err) {
-      setIsLoading(false);
-      console.error('[SignUp] API failed:', err);
-      addToast('Cannot connect to registration service.', 'error');
     }
+
+    setIsLoading(false);
+    addToast(`Cannot connect to registration service at ${activeUrl}. Please verify server is online.`, 'error');
   };
 
   // Map subpaths to role names
@@ -101,30 +119,46 @@ export const LoginPage: React.FC = () => {
 
     setIsLoading(true);
     const targetRole = getRoleKey(selectedRoleKey);
+    const rawUrl = localStorage.getItem('medx_api_url') || (import.meta as any).env?.VITE_API_BASE_URL || API_BASE_URL || 'http://localhost:3001';
+    const activeUrl = rawUrl.replace(/\/$/, '');
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, role: targetRole })
-      });
-      
-      const data = await response.json();
-      setIsLoading(false);
+    let attempts = 0;
+    const maxAttempts = 3;
 
-      if (data.success) {
-        localStorage.setItem('medx_session', JSON.stringify(data.user));
-        addToast(`Successfully authenticated as ${data.user.name}`, 'success');
-        navigateTo(`/${targetRole.toLowerCase()}`);
-      } else {
-        addToast(data.message || 'Authentication failed', 'error');
+    while (attempts < maxAttempts) {
+      attempts++;
+      try {
+        if (attempts > 1) {
+          addToast(`Waking up Render backend (Attempt ${attempts}/${maxAttempts})... Please wait.`, 'info');
+        }
+
+        const response = await fetch(`${activeUrl}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, role: targetRole })
+        });
+        
+        const data = await response.json();
+        setIsLoading(false);
+
+        if (data.success) {
+          localStorage.setItem('medx_session', JSON.stringify(data.user));
+          addToast(`Successfully authenticated as ${data.user.name}`, 'success');
+          navigateTo(`/${targetRole.toLowerCase()}`);
+        } else {
+          addToast(data.message || 'Authentication failed', 'error');
+        }
+        return;
+      } catch (err) {
+        console.warn(`[Login] Auth attempt ${attempts} failed:`, err);
+        if (attempts < maxAttempts) {
+          await new Promise(res => setTimeout(res, 2500));
+        }
       }
-    } catch (err) {
-      setIsLoading(false);
-      console.error('[Login] Auth endpoint call failed:', err);
-      const activeUrl = localStorage.getItem('medx_api_url') || (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001';
-      addToast(`Cannot connect to backend server at ${activeUrl}. Please click "⚙️ Configure Backend URL" at bottom.`, 'error');
     }
+
+    setIsLoading(false);
+    addToast(`Cannot connect to ${activeUrl}. Render free tier takes ~30s to wake up on first visit. Try logging in again!`, 'error');
   };
 
   const handleConfigureBackendUrl = () => {
