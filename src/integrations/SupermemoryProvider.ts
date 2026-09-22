@@ -1,4 +1,5 @@
 import { apiKeys } from '../config/apiKeys';
+import { getApiBaseUrl } from '../config/api';
 
 export interface PatientMemoryContext {
   chronicDiseases: string[];
