@@ -12,6 +12,8 @@ import { AgentFactory } from '../agents/AgentFactory';
 import { agentsConfig } from '../config/agents';
 import { MemoryService } from '../services/MemoryService';
 
+import { API_BASE_URL } from '../config/api';
+
 export class MedXEngine {
   static async processRequest(
     patientId: string, 
@@ -19,7 +21,7 @@ export class MedXEngine {
     mode: 'Mock' | 'Production' = 'Mock'
   ): Promise<PipelineExecutionResult> {
     if (typeof window !== 'undefined') {
-      const response = await fetch('http://localhost:3001/api/requests', {
+      const response = await fetch(`${API_BASE_URL}/api/requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ patientId, query, mode })

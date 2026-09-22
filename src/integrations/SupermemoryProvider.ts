@@ -33,7 +33,7 @@ export class SupermemoryProvider {
 
     // Standard database fallback values based on patient profiles
     try {
-      const baseUrl = typeof window !== 'undefined' ? '' : 'http://localhost:3001';
+      const baseUrl = getApiBaseUrl();
       const response = await fetch(`${baseUrl}/api/patients/${patientId}`);
       if (response.ok) {
         const data = await response.json();
