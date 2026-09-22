@@ -122,7 +122,24 @@ export const LoginPage: React.FC = () => {
     } catch (err) {
       setIsLoading(false);
       console.error('[Login] Auth endpoint call failed:', err);
-      addToast('Cannot connect to authentication service.', 'error');
+      const activeUrl = localStorage.getItem('medx_api_url') || (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001';
+      addToast(`Cannot connect to backend server at ${activeUrl}. Please click "⚙️ Configure Backend URL" at bottom.`, 'error');
+    }
+  };
+
+  const handleConfigureBackendUrl = () => {
+    const current = localStorage.getItem('medx_api_url') || (import.meta as any).env?.VITE_API_BASE_URL || '';
+    const val = prompt('Enter your live Render Backend Server URL (e.g. https://your-app.onrender.com):', current);
+    if (val !== null) {
+      const trimmed = val.trim();
+      if (trimmed) {
+        localStorage.setItem('medx_api_url', trimmed);
+        addToast(`Backend URL set to: ${trimmed}. Reloading page...`, 'success');
+      } else {
+        localStorage.removeItem('medx_api_url');
+        addToast('Cleared custom backend URL. Reverting to default...', 'info');
+      }
+      setTimeout(() => window.location.reload(), 1000);
     }
   };
 
@@ -841,9 +858,27 @@ export const LoginPage: React.FC = () => {
             24/7 Support
           </span>
         </div>
-        <span style={{ fontSize: '11px', fontWeight: 600, color: '#94A3B8' }}>
-          © 2026 MedXNet. All rights reserved.
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button 
+            onClick={handleConfigureBackendUrl}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              color: '#3B82F6', 
+              fontSize: '11px', 
+              fontWeight: 600, 
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            ⚙️ Configure Backend Server URL
+          </button>
+          <span style={{ fontSize: '11px', fontWeight: 600, color: '#94A3B8' }}>
+            © 2026 MedXNet. All rights reserved.
+          </span>
+        </div>
       </div>
 
       {/* Premium hover transitions styling CSS */}
